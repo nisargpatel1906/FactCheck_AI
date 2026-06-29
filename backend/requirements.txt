@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+websockets
+python-dotenv
+openai
+pydantic-ai
+sqlite-vec
+duckduckgo-search
+httpx
