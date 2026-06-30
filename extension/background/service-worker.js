@@ -158,6 +158,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
   } 
 
+  else if (message.type === "audio_progress") {
+    chrome.tabs.query({}, (tabs) => {
+      tabs.forEach((tab) => {
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, message).catch(() => {});
+        }
+      });
+    });
+  }
+
   else if (message.type === "offscreen-ready") {
     console.log("[Service Worker] Offscreen ready received. Pending stream ID:", pendingStreamId);
     if (pendingStreamId) {

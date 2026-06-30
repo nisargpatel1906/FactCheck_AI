@@ -123,6 +123,7 @@ function setupSidebarOverlay() {
       <span class="active-pill"><span class="active-pill__dot"></span>Active</span>
     </div>
     <p class="monitor-subtitle">Scanning active tab</p>
+    <div class="recording-timer" id="recording-timer" style="display: none; font-size: 12px; font-weight: 500; color: var(--accent-blue, #3a86ff); margin-top: 8px;"></div>
     
     <div class="live-transcribe-box hidden" id="live-transcribe">
       <div class="transcribe-title">LIVE TRANSCRIPT</div>
@@ -583,6 +584,21 @@ function handleTranscriptionUpdate(data) {
   }
 }
 
+function handleAudioProgress(data) {
+  setupSidebarOverlay();
+  if (!shadow) return;
+  const timerEl = shadow.getElementById("recording-timer");
+  if (!timerEl) return;
+  
+  if (data.durationMs === 0) {
+     timerEl.style.display = "none";
+  } else {
+     timerEl.style.display = "block";
+     const timeLeft = Math.max(0, Math.ceil((data.maxMs - data.durationMs) / 1000));
+     timerEl.innerText = `Recording audio... Sending chunk in ${timeLeft}s`;
+  }
+}
+
 // Receive messages from background script WebSocket relay
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "ping") {
@@ -601,6 +617,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleVerdictUpdate(message);
   } else if (message.type === "transcription") {
     handleTranscriptionUpdate(message);
+  } else if (message.type === "audio_progress") {
+    handleAudioProgress(message);
   }
 });
 

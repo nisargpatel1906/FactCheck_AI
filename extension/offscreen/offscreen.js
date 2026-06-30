@@ -19,6 +19,7 @@ let audioBuffer = [];
 let isSpeaking = false;
 let silenceTimer = null;
 let speechStartTimestamp = null;
+let lastProgressMs = 0;
 
 // Listen for messages from background service worker
 chrome.runtime.onMessage.addListener(async (message) => {
@@ -83,6 +84,16 @@ async function startCapture(streamId) {
 
     // Check max chunk duration constraint (exactly 1 minute / 60 seconds)
     const durationMs = (audioBuffer.length / SAMPLE_RATE) * 1000;
+    
+    if (durationMs - lastProgressMs >= 1000) {
+      lastProgressMs = durationMs;
+      chrome.runtime.sendMessage({
+        type: "audio_progress",
+        durationMs: durationMs,
+        maxMs: MAX_CHUNK_DURATION_MS
+      }).catch(()=>{});
+    }
+
     if (durationMs >= MAX_CHUNK_DURATION_MS) {
       console.log("[Offscreen] 1-minute chunk duration reached. Flushing chunk.");
       flushBuffer();
@@ -119,6 +130,12 @@ async function stopCapture() {
   }
 
   flushBuffer();
+  lastProgressMs = 0;
+  chrome.runtime.sendMessage({
+    type: "audio_progress",
+    durationMs: 0,
+    maxMs: MAX_CHUNK_DURATION_MS
+  }).catch(()=>{});
   console.log("[Offscreen] Tab audio capturing stopped.");
 }
 
@@ -135,6 +152,7 @@ function flushBuffer() {
 
   const chunkBuffer = [...audioBuffer];
   audioBuffer = [];
+  lastProgressMs = 0;
   isSpeaking = false;
 
   // Convert float samples to 16-bit PCM WAV
