@@ -83,7 +83,8 @@ try:
             "2. Provide a confidence score between 0.0 and 1.0.\n"
             "3. Summarize your evidence in bullet points.\n"
             "4. Compile a list of direct search sources (including title, url, domain).\n"
-            "5. Rely only on verified information retrieved from the search tool. Do not hallucinate URLs."
+            "5. Rely only on verified information retrieved from the search tool. Do not hallucinate URLs.\n"
+            "6. When investigating claims originating from regional contexts (e.g., India), prioritize searching for local sources, official data from that region, and region-specific fact-checkers."
         )
     )
 

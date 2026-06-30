@@ -38,7 +38,8 @@ try:
             "1. Extract ONLY objective factual statements (e.g. 'Inflation has risen by 10% this year').\n"
             "2. DO NOT extract subjective opinions, predictions, personal preferences, questions, jokes, or conversational filler.\n"
             "3. Formulate each claim so that it stands alone as a complete sentence with full context (resolving pronouns like 'he', 'they', or 'this' to their corresponding entities if clear from the context).\n"
-            "4. If no checkable factual claims are present in the text, return an empty list."
+            "4. If no checkable factual claims are present in the text, return an empty list.\n"
+            "5. If the context of the transcript suggests it is from a specific country (e.g., India, based on names, locations, or topics), explicitly include that geographical context in the standalone claim (e.g. use 'The Prime Minister of India' instead of just 'The Prime Minister')."
         )
     )
 except Exception as e:
