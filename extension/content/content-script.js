@@ -55,6 +55,7 @@ function setupSidebarOverlay() {
   const sidebar = document.createElement("div");
   sidebar.id = "factcheck-sidebar";
   sidebar.className = "sidebar-container";
+  sidebar.style.display = "none"; // Hide by default until storage check resolves
   
   // Left Nav (Mockup layout)
   const sidebarNav = document.createElement("div");
@@ -207,9 +208,11 @@ function setupSidebarOverlay() {
     if (result.audioCaptureEnabled !== undefined) {
       enableAudioCheckbox.checked = result.audioCaptureEnabled;
     }
-    if (result.showOverlay !== undefined) {
-      enableOverlayCheckbox.checked = result.showOverlay;
-    }
+    
+    // Default to false if not yet set
+    const shouldShow = result.showOverlay === true;
+    enableOverlayCheckbox.checked = shouldShow;
+    toggleOverlayVisibility(shouldShow);
   });
   
 
