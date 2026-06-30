@@ -78,18 +78,19 @@ Built with plain HTML, CSS, and vanilla JavaScript on Manifest V3 — no build s
 Built with **FastAPI** and **Pydantic AI**, orchestrated with `asyncio`.
 
 - **WebSocket Server** — ingests caption/audio data and streams real-time status updates and verdicts back to the extension.
-- **Speech-to-Text** — transcribes raw audio chunks via NVIDIA's Parakeet model, used only when captions aren't available.
-- **Claim Detection** *(Nemotron Nano)* — a single batched call per transcript window, filtering for genuinely checkable factual claims.
-- **Parallel Research** *(Nemotron Super)* — three tool-calling agents gather evidence via web search, each from a different angle.
-- **Collaborative Debate** *(Nemotron Super)* — agents review each other's research and revise their positions in one round.
-- **The Judge** *(Nemotron Ultra)* — produces the final structured verdict, explanation, and source list.
+- **Speech-to-Text** — transcribes and natively translates raw audio chunks via Groq's Whisper API, used only when captions aren't available.
+- **Claim Detection** *(Llama 3.1)* — a single batched call per transcript window, filtering for genuinely checkable factual claims.
+- **Parallel Research** *(Llama 3.1)* — three tool-calling agents gather evidence via web search, each from a different angle.
+- **Collaborative Debate** *(Llama 3.1)* — agents review each other's research and revise their positions in one round.
+- **The Judge** *(Llama 3.1)* — produces the final structured verdict, explanation, and source list.
 - **Semantic Cache** — a local SQLite database extended with `sqlite-vec`, storing every claim's embedding and verdict for instant future recall.
 
 ## Technology Stack
 
 | Layer | Technology |
 |---|---|
-| Language Models | NVIDIA NIM (Nemotron Nano, Nemotron Super, Nemotron Ultra, Parakeet STT, NV-EmbedQA) |
+| Language Models | Llama 3.1 via NVIDIA NIM, NV-EmbedQA |
+| Speech-to-Text | Whisper-large-v3-turbo via Groq |
 | Agent Orchestration | Pydantic AI, Python `asyncio` |
 | Backend Framework | FastAPI |
 | Caching / Storage | SQLite + `sqlite-vec` |
@@ -104,6 +105,7 @@ Built with **FastAPI** and **Pydantic AI**, orchestrated with `asyncio`.
 - **Python 3.11+**
 - **Google Chrome**, version 116 or later
 - An **NVIDIA API key**, free from [build.nvidia.com](https://build.nvidia.com)
+- A **Groq API key**, free from [console.groq.com](https://console.groq.com)
 - *(Optional)* A **Tavily API key**, for enhanced web search — DuckDuckGo is used otherwise
 
 ### 1. Set Up the Backend
