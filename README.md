@@ -1,101 +1,195 @@
-# 🛡️ FactCheck AI
+<div align="center">
+<img src="logo.png" alt="FactCheck AI Logo" width="120" style="margin-bottom: 20px;">
 
-FactCheck AI is a real-time, browser-based fact-checking pipeline designed to actively monitor live video and audio streams (like YouTube or news broadcasts) and autonomously verify factual claims as they are spoken. 
+# FactCheck AI
 
-Powered by a local asynchronous Python backend, **NVIDIA NIM** models, and a multi-agent debate architecture, FactCheck AI surfaces verified truth directly in your browser without interrupting your viewing experience.
+**Real-time, multi-agent fact-checking for the videos you're already watching.**
 
----
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/)
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Manifest%20V3-yellow)](https://developer.chrome.com/docs/extensions/mv3/intro/)
+[![Status: In Development](https://img.shields.io/badge/Status-In%20Development-orange)]()
 
-## ✨ Features
-
-- **Real-Time Claim Detection**: Silently monitors closed captions or live tab audio to identify testable factual claims.
-- **Multi-Agent Research Pipeline**: Dispatches 3 parallel AI research agents to investigate the claim from different angles (general news, official data, and fact-checking sites).
-- **Collaborative Debate**: Agents debate their initial findings, updating their stances based on cross-referenced evidence.
-- **Final Judge Verdict**: A powerful judge model synthesizes the debate to issue a final verdict (`SUPPORTED`, `CONTRADICTED`, `MIXED`, `UNVERIFIABLE`).
-- **Semantic Caching**: Utilizes `sqlite-vec` to instantly recall verdicts for previously checked claims via vector embeddings, saving API calls and time.
-- **Sleek Browser Overlay**: A modern, non-intrusive sidebar directly injected into the webpage via Shadow DOM, displaying live fact-checking feeds and sources.
+</div>
 
 ---
 
-## 🏗️ Architecture
+FactCheck AI is a browser extension and local backend that watches the video playing in your active tab, listens for spoken factual claims, and automatically researches them in the background using a team of cooperating AI agents — surfacing a verdict, with sources, directly on the page, without ever pausing your video.
 
-FactCheck AI consists of two primary layers:
-
-### 1. Browser Extension (Frontend)
-Built using plain HTML, CSS, and Vanilla JavaScript (Manifest V3). 
-* **Content Script**: Injects the UI overlay using Shadow DOM to prevent style conflicts with the host page. Captures YouTube captions automatically.
-* **Offscreen Document**: Serves as a fallback for capturing raw tab audio when closed captions are unavailable, chunking it via Voice Activity Detection (VAD).
-* **Service Worker**: Maintains a persistent WebSocket connection to the Python backend to stream captions/audio and receive live status updates and verdicts.
-
-### 2. Python Backend (Server)
-Built with **FastAPI** and **Pydantic AI**, orchestrated via `asyncio`.
-* **WebSocket Server**: Ingests transcription chunks and streams real-time state changes to the UI.
-* **Speech-To-Text (STT)**: (Optional) Transcribes raw audio chunks if captions are not provided.
-* **Agent Flow**:
-  1. **Claim Detection** (`Nemotron Nano`): Fast, cheap filtering to determine if a sentence is a factual claim.
-  2. **Parallel Research** (`Nemotron Super`): Tool-calling agents use Tavily/DuckDuckGo to gather evidence.
-  3. **Collaborative Debate** (`Nemotron Super`): Agents review each other's research and refine their stances.
-  4. **The Judge** (`Nemotron Ultra`): Evaluates the final debate and produces a concrete verdict with sources.
+It is built specifically for political speeches, debates, and news broadcasts, where a claim is made once, in passing, and the viewer has no realistic way to check it in the moment.
 
 ---
 
-## 🚀 Getting Started
+## Table of Contents
+
+- [How It Works](#how-it-works)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Technology Stack](#technology-stack)
+- [Getting Started](#getting-started)
+- [Usage](#usage)
+- [Project Structure](#project-structure)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+- [Developers](#developers)
+
+---
+
+## How It Works
+
+1. **Listen** — the extension reads existing closed captions when available, or falls back to capturing tab audio and transcribing it locally.
+2. **Detect** — a lightweight model continuously scans the transcript and flags sentences that are actual, checkable factual claims (filtering out opinion, jokes, and filler).
+3. **Check the cache** — each new claim is compared against previously verified claims using semantic similarity, so a differently-worded repeat of a claim already checked returns instantly, with zero new research.
+4. **Research** — for genuinely new claims, three agents investigate in parallel from different angles: general news coverage, official/government data, and existing fact-checking sources.
+5. **Debate** — the three agents review each other's findings in a single round and revise their own conclusions where warranted.
+6. **Judge** — a final, stronger model synthesizes the debate into one verdict, with a plain-language explanation and the actual sources used.
+7. **Surface** — the verdict appears in an on-page overlay within seconds, color-coded and ready to expand for the full explanation and citations.
+
+## Features
+
+| | |
+|---|---|
+| **Real-Time Claim Detection** | Monitors closed captions or live tab audio to identify testable factual claims as they're spoken. |
+| **Multi-Agent Research Pipeline** | Dispatches three parallel research agents, each investigating a claim from a distinct angle. |
+| **Collaborative Debate Round** | Agents cross-reference each other's evidence and revise their stance before a verdict is reached. |
+| **Final Judge Verdict** | A dedicated judge model synthesizes the debate into one of four clear outcomes: `SUPPORTED`, `CONTRADICTED`, `MIXED`, or `UNVERIFIABLE`. |
+| **Semantic Caching** | Uses `sqlite-vec` to instantly recall verdicts for previously checked claims via vector similarity, even when reworded — saving both time and API usage. |
+| **Non-Intrusive Overlay** | A calm, modern sidebar injected via Shadow DOM, fully style-isolated from the host page, showing a live feed of claims and verdicts. |
+
+## Architecture
+
+FactCheck AI is composed of two cooperating layers, connected over a single persistent WebSocket connection.
+
+### Browser Extension (Frontend)
+
+Built with plain HTML, CSS, and vanilla JavaScript on Manifest V3 — no build step, no framework.
+
+- **Content Script** — locates the video element, reads caption text when available, and renders the overlay UI inside a Shadow DOM to stay visually isolated from the host page.
+- **Offscreen Document** — the fallback path used only when no captions exist; captures raw tab audio and segments it using Voice Activity Detection so each chunk sent for transcription is one complete spoken phrase.
+- **Background Service Worker** — holds the persistent WebSocket connection to the backend, sending a keepalive ping every 20 seconds (required to keep an MV3 service worker alive on Chrome 116+) and relaying messages between the page and the server.
+
+### Python Backend (Server)
+
+Built with **FastAPI** and **Pydantic AI**, orchestrated with `asyncio`.
+
+- **WebSocket Server** — ingests caption/audio data and streams real-time status updates and verdicts back to the extension.
+- **Speech-to-Text** — transcribes raw audio chunks via NVIDIA's Parakeet model, used only when captions aren't available.
+- **Claim Detection** *(Nemotron Nano)* — a single batched call per transcript window, filtering for genuinely checkable factual claims.
+- **Parallel Research** *(Nemotron Super)* — three tool-calling agents gather evidence via web search, each from a different angle.
+- **Collaborative Debate** *(Nemotron Super)* — agents review each other's research and revise their positions in one round.
+- **The Judge** *(Nemotron Ultra)* — produces the final structured verdict, explanation, and source list.
+- **Semantic Cache** — a local SQLite database extended with `sqlite-vec`, storing every claim's embedding and verdict for instant future recall.
+
+## Technology Stack
+
+| Layer | Technology |
+|---|---|
+| Language Models | NVIDIA NIM (Nemotron Nano, Nemotron Super, Nemotron Ultra, Parakeet STT, NV-EmbedQA) |
+| Agent Orchestration | Pydantic AI, Python `asyncio` |
+| Backend Framework | FastAPI |
+| Caching / Storage | SQLite + `sqlite-vec` |
+| Web Search | Tavily / DuckDuckGo |
+| Frontend | HTML5, CSS3, Vanilla JavaScript |
+| Extension Platform | Chrome Manifest V3 |
+
+## Getting Started
 
 ### Prerequisites
-* **Python 3.11+**
-* **Google Chrome** (Version 116+)
-* **NVIDIA API Key** (from [build.nvidia.com](https://build.nvidia.com))
-* **Tavily API Key** (Optional, for enhanced web search capabilities)
 
-### 1. Setup the Backend Server
-1. Navigate to the `backend/` directory.
-2. Create a virtual environment and install dependencies:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
-3. Configure your environment variables:
-   Copy `.env.example` to `.env` inside the `backend/` directory and populate it:
-   ```env
-   NVIDIA_API_KEY=your_nvidia_api_key_here
-   TAVILY_API_KEY=your_tavily_api_key_here
-   ```
-4. Start the server:
-   ```bash
-   uvicorn main:app --host 127.0.0.1 --port 8000
-   # Alternatively, run the start.bat script on Windows.
-   ```
+- **Python 3.11+**
+- **Google Chrome**, version 116 or later
+- An **NVIDIA API key**, free from [build.nvidia.com](https://build.nvidia.com)
+- *(Optional)* A **Tavily API key**, for enhanced web search — DuckDuckGo is used otherwise
+
+### 1. Set Up the Backend
+
+```bash
+cd backend
+
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment variables
+cp .env.example .env
+```
+
+Edit `.env` with your keys:
+
+```env
+NVIDIA_API_KEY=your_nvidia_api_key_here
+TAVILY_API_KEY=your_tavily_api_key_here   # optional
+```
+
+Start the server:
+
+```bash
+uvicorn main:app --host 127.0.0.1 --port 8000
+```
 
 ### 2. Install the Browser Extension
-1. Open Google Chrome and navigate to `chrome://extensions/`.
-2. Enable **Developer mode** (toggle in the top right corner).
-3. Click **Load unpacked** and select the `extension/` folder from this repository.
-4. Pin the **FactCheck AI** icon to your browser toolbar.
 
-### 3. Usage
-1. Open any YouTube video (e.g., a news broadcast or political speech).
-2. Click the **FactCheck AI** extension icon in your toolbar.
-3. The sidebar will slide open. As the speaker talks, claims will automatically populate the sidebar, transitioning from `Checking` to their final colored verdict along with cited sources!
+1. Open Chrome and go to `chrome://extensions/`.
+2. Enable **Developer mode** (top-right toggle).
+3. Click **Load unpacked** and select the `extension/` folder.
+4. Pin the FactCheck AI icon to your toolbar.
 
----
+## Usage
 
-## 🛠️ Technology Stack
-* **Language Models**: NVIDIA Inference Microservices (NIM)
-  * Meta Llama 3.1 8B (Claim Detection)
-  * Nemotron Super/Ultra (Research & Judging)
-  * NV-EmbedQA (Semantic Search)
-* **Backend**: Python, FastAPI, Pydantic AI, SQLite (`sqlite-vec`)
-* **Frontend**: HTML5, CSS3, Vanilla JavaScript, Chrome Extension API (Manifest V3)
+1. Open any video with spoken political or factual content (e.g. a news broadcast or speech) on YouTube.
+2. Click the FactCheck AI icon to open the overlay.
+3. As the video plays, claims populate the feed automatically, moving through `Checking → Researching → Debating` before resolving to a final, color-coded verdict with cited sources.
 
----
+## Project Structure
 
-## 📝 License
-This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**. See the [LICENSE](LICENSE) file for more details.
+```text
+factcheck-ai/
+├── extension/
+│   ├── manifest.json
+│   ├── background/        # WebSocket connection, keepalive, message relay
+│   ├── content/            # Caption reading, overlay UI (Shadow DOM)
+│   ├── offscreen/          # Tab audio capture + VAD chunking
+│   └── popup/               # Feed / Sources / Settings UI
+├── backend/
+│   ├── main.py               # FastAPI app, WebSocket endpoint
+│   ├── stt.py                  # Speech-to-text (Parakeet)
+│   ├── claim_detection.py      # Claim filtering (Nemotron Nano)
+│   ├── cache.py                # Semantic cache (SQLite + sqlite-vec)
+│   ├── queue_manager.py        # Async queue / worker pool
+│   ├── agents/                  # Research, debate, and judge agents
+│   └── schemas.py               # Shared Pydantic models
+├── PRD.md
+├── BRAND_GUIDE.md
+└── README.md
+```
 
----
+## Roadmap
 
-## 👨‍💻 Developers
-This project is proudly developed by:
-* **Nisarg Patel** - [GitHub Profile](https://github.com/nisargpatel1906)
-* **Kathan Shah** - [GitHub Profile](https://github.com/kathan472)
+- [ ] Support for additional languages beyond English
+- [ ] Per-user API key support for multi-user / public release
+- [ ] Always-on cloud-hosted backend option
+- [ ] Support for additional video platforms beyond YouTube
+
+## Contributing
+
+Contributions, issues, and feature suggestions are welcome. If you'd like to contribute:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes with a clear message
+4. Open a pull request describing what changed and why
+
+Please keep pull requests focused on a single change where possible, and follow the existing code style.
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE) for the full text.
+
+## Developers
+
+- **Nisarg Patel** — [GitHub](https://github.com/nisargpatel1906)
+- **Kathan Shah** — [GitHub](https://github.com/kathan472)
