@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" width="100%" height="100%">
+  <!-- Definitions for gradients and shadows -->
+  <defs>
+    <!-- Card Shadow -->
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#151c27" flood-opacity="0.06" />
+    </filter>
+    
+    <!-- Pulse Animation for Scanning -->
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+      text {
+        font-family: 'Inter', -apple-system, sans-serif;
+      }
+      .node-card {
+        transition: transform 0.2s ease;
+      }
+      .node-card:hover {
+        transform: translateY(-2px);
+      }
+      .flow-line {
+        stroke-dasharray: 8;
+        animation: flow 25s linear infinite;
+      }
+      @keyframes flow {
+        to {
+          stroke-dashoffset: -100;
+        }
+      }
+    </style>
+  </defs>
+
+  <!-- Background Surface -->
+  <rect width="1000" height="600" fill="#f9f9ff" rx="16" />
+  
+  <!-- Outer Border -->
+  <rect x="15" y="15" width="970" height="570" fill="none" stroke="#e2e8f8" stroke-width="2" rx="12" />
+
+  <!-- Diagram Title Header -->
+  <g transform="translate(40, 55)">
+    <text x="0" y="0" font-size="22" font-weight="700" fill="#151c27" letter-spacing="-0.02em">FactCheck AI Agent Workflow</text>
+    <text x="0" y="20" font-size="13" font-weight="400" fill="#76777d">Real-time collaborative multi-agent debate and semantic verification pipeline</text>
+  </g>
+
+  <!-- Flow Lines (Connectors) -->
+  <!-- Ingest -> Detection -->
+  <path d="M 160 215 L 210 215" fill="none" stroke="#c6c6cd" stroke-width="2.5" />
+  <!-- Detection -> Cache -->
+  <path d="M 330 215 L 370 215" fill="none" stroke="#c6c6cd" stroke-width="2.5" />
+  <!-- Cache Hit -> Sidebar (Direct Shortcut) -->
+  <path d="M 430 175 L 430 110 L 890 110 L 890 175" fill="none" stroke="#1e8e5a" stroke-width="2.5" stroke-dasharray="6" />
+  <text x="640" y="100" font-size="11" font-weight="600" fill="#1e8e5a" text-anchor="middle">SEMANTIC CACHE HIT (INSTANT RETURN)</text>
+  
+  <!-- Cache Miss -> Agent Dispatch Splitter -->
+  <path d="M 490 215 L 530 215" fill="none" stroke="#c6c6cd" stroke-width="2.5" />
+  
+  <!-- Split Paths to Parallel Agents -->
+  <path d="M 530 215 L 530 155 L 570 155" fill="none" stroke="#0058be" stroke-width="2" class="flow-line" />
+  <path d="M 530 215 L 570 215" fill="none" stroke="#0058be" stroke-width="2" class="flow-line" />
+  <path d="M 530 215 L 530 275 L 570 275" fill="none" stroke="#0058be" stroke-width="2" class="flow-line" />
+  
+  <!-- Parallel Agents -> Debate Assembly -->
+  <path d="M 690 155 L 725 155 L 725 215 L 755 215" fill="none" stroke="#0058be" stroke-width="2" />
+  <path d="M 690 215 L 755 215" fill="none" stroke="#0058be" stroke-width="2" />
+  <path d="M 690 275 L 725 275 L 725 215 L 755 215" fill="none" stroke="#0058be" stroke-width="2" />
+  
+  <!-- Debate -> Judge -->
+  <path d="M 815 240 C 815 285, 785 320, 785 365" fill="none" stroke="#0058be" stroke-width="2" />
+  <!-- Judge -> Cache Update -->
+  <path d="M 725 410 L 490 410" fill="none" stroke="#76777d" stroke-width="2" stroke-dasharray="4" />
+  <text x="600" y="400" font-size="10" font-weight="500" fill="#76777d" text-anchor="middle">Write back new verdict</text>
+  
+  <!-- Judge -> Sidebar Overlay -->
+  <path d="M 845 410 L 890 410 L 890 255" fill="none" stroke="#1e8e5a" stroke-width="2.5" />
+  
+  <!-- 1. DATA INPUT (Webpage / YouTube) -->
+  <g class="node-card" transform="translate(40, 160)" filter="url(#shadow)">
+    <rect width="120" height="110" fill="#ffffff" stroke="#c6c6cd" stroke-width="1.5" rx="8" />
+    <path d="M 0 0 L 0 110" stroke="#0058be" stroke-width="4" />
+    <!-- Header -->
+    <text x="12" y="25" font-size="10" font-weight="600" fill="#0058be" letter-spacing="0.05em">STEP 1</text>
+    <text x="12" y="45" font-size="14" font-weight="700" fill="#151c27">Audio / CC</text>
+    <text x="12" y="65" font-size="11" font-weight="400" fill="#45464d">YouTube Captions</text>
+    <text x="12" y="80" font-size="11" font-weight="400" fill="#45464d">or Tab Capture</text>
+    <text x="12" y="95" font-size="10" font-weight="500" fill="#76777d">Real-time Stream</text>
+  </g>
+
+  <!-- 2. CLAIM DETECTION (Nemotron Nano) -->
+  <g class="node-card" transform="translate(210, 160)" filter="url(#shadow)">
+    <rect width="120" height="110" fill="#ffffff" stroke="#c6c6cd" stroke-width="1.5" rx="8" />
+    <path d="M 0 0 L 0 110" stroke="#151c27" stroke-width="4" />
+    <!-- Header -->
+    <text x="12" y="25" font-size="10" font-weight="600" fill="#76777d" letter-spacing="0.05em">STEP 2</text>
+    <text x="12" y="45" font-size="13" font-weight="700" fill="#151c27">Claim Detector</text>
+    <text x="12" y="65" font-size="11" font-weight="500" fill="#0058be">Nemotron Nano</text>
+    <text x="12" y="85" font-size="10" font-weight="400" fill="#45464d">Filters opinion</text>
+    <text x="12" y="97" font-size="10" font-weight="400" fill="#45464d">&amp; filler text</text>
+  </g>
+
+  <!-- 3. SEMANTIC CACHE (SQLite-Vec) -->
+  <g class="node-card" transform="translate(370, 160)" filter="url(#shadow)">
+    <rect width="120" height="110" fill="#ffffff" stroke="#c6c6cd" stroke-width="1.5" rx="8" />
+    <path d="M 0 0 L 0 110" stroke="#1e8e5a" stroke-width="4" />
+    <!-- Header -->
+    <text x="12" y="25" font-size="10" font-weight="600" fill="#1e8e5a" letter-spacing="0.05em">STEP 3</text>
+    <text x="12" y="45" font-size="13" font-weight="700" fill="#151c27">Semantic Cache</text>
+    <text x="12" y="65" font-size="11" font-weight="500" fill="#45464d">SQLite + sqlite-vec</text>
+    <text x="12" y="85" font-size="10" font-weight="400" fill="#76777d">Cosine similarity</text>
+    <text x="12" y="97" font-size="10" font-weight="400" fill="#76777d">check threshold</text>
+  </g>
+
+  <!-- 4. PARALLEL AGENTS (Nemotron Super) -->
+  <!-- Agent 1: General News -->
+  <g class="node-card" transform="translate(570, 110)" filter="url(#shadow)">
+    <rect width="120" height="50" fill="#ffffff" stroke="#c6c6cd" stroke-width="1.5" rx="6" />
+    <path d="M 0 0 L 0 50" stroke="#0058be" stroke-width="3" />
+    <text x="10" y="20" font-size="11" font-weight="700" fill="#151c27">News Agent</text>
+    <text x="10" y="35" font-size="9" font-weight="500" fill="#76777d">Searches Google/Tavily</text>
+  </g>
+  
+  <!-- Agent 2: Official Data -->
+  <g class="node-card" transform="translate(570, 190)" filter="url(#shadow)">
+    <rect width="120" height="50" fill="#ffffff" stroke="#c6c6cd" stroke-width="1.5" rx="6" />
+    <path d="M 0 0 L 0 50" stroke="#0058be" stroke-width="3" />
+    <text x="10" y="20" font-size="11" font-weight="700" fill="#151c27">Official Data</text>
+    <text x="10" y="35" font-size="9" font-weight="500" fill="#76777d">Gov/Academic Sources</text>
+  </g>
+
+  <!-- Agent 3: Fact-Check Sites -->
+  <g class="node-card" transform="translate(570, 250)" filter="url(#shadow)">
+    <rect width="120" height="50" fill="#ffffff" stroke="#c6c6cd" stroke-width="1.5" rx="6" />
+    <path d="M 0 0 L 0 50" stroke="#0058be" stroke-width="3" />
+    <text x="10" y="20" font-size="11" font-weight="700" fill="#151c27">Fact-Check Agent</text>
+    <text x="10" y="35" font-size="9" font-weight="500" fill="#76777d">PolitiFact / Snopes</text>
+  </g>
+
+  <!-- Background label for parallel agents -->
+  <rect x="555" y="85" width="150" height="230" fill="none" stroke="#0058be" stroke-dasharray="4" rx="8" pointer-events="none" />
+  <text x="630" y="307" font-size="9" font-weight="600" fill="#0058be" text-anchor="middle" letter-spacing="0.05em">STEP 4: RESEARCH</text>
+
+  <!-- 5. COLLABORATIVE DEBATE (Nemotron Super) -->
+  <g class="node-card" transform="translate(755, 175)" filter="url(#shadow)">
+    <rect width="60" height="80" fill="#ffffff" stroke="#0058be" stroke-width="1.5" rx="8" />
+    <path d="M 0 0 L 0 80" stroke="#0058be" stroke-width="4" />
+    <text x="30" y="30" font-size="11" font-weight="700" fill="#151c27" text-anchor="middle">Debate</text>
+    <text x="30" y="45" font-size="11" font-weight="700" fill="#151c27" text-anchor="middle">Round</text>
+    <text x="30" y="65" font-size="9" font-weight="500" fill="#0058be" text-anchor="middle">Super 49B</text>
+  </g>
+
+  <!-- 6. FINAL JUDGE (Nemotron Ultra) -->
+  <g class="node-card" transform="translate(725, 365)" filter="url(#shadow)">
+    <rect width="120" height="90" fill="#ffffff" stroke="#c6c6cd" stroke-width="1.5" rx="8" />
+    <path d="M 0 0 L 0 90" stroke="#151c27" stroke-width="4" />
+    <text x="12" y="25" font-size="10" font-weight="600" fill="#76777d" letter-spacing="0.05em">STEP 5</text>
+    <text x="12" y="45" font-size="14" font-weight="700" fill="#151c27">Final Judge</text>
+    <text x="12" y="65" font-size="11" font-weight="600" fill="#0058be">Nemotron Ultra</text>
+    <text x="12" y="80" font-size="9" font-weight="500" fill="#45464d">Verifies and explains</text>
+  </g>
+
+  <!-- 7. SIDEBAR OVERLAY UI (Chrome Extension) -->
+  <g class="node-card" transform="translate(830, 175)" filter="url(#shadow)">
+    <rect width="120" height="80" fill="#ffffff" stroke="#c6c6cd" stroke-width="1.5" rx="8" />
+    <path d="M 0 0 L 0 80" stroke="#1e8e5a" stroke-width="4" />
+    <text x="12" y="25" font-size="9" font-weight="600" fill="#1e8e5a" letter-spacing="0.05em">LIVE SIDEBAR</text>
+    <text x="12" y="45" font-size="13" font-weight="700" fill="#151c27">Veracity UI</text>
+    <text x="12" y="65" font-size="9" font-weight="500" fill="#45464d">Displays verdicts &amp;</text>
+    <text x="12" y="74" font-size="9" font-weight="500" fill="#45464d">cited source links</text>
+  </g>
+
+  <!-- Database / Semantic Cache Storage Graphic -->
+  <g transform="translate(370, 365)" filter="url(#shadow)">
+    <rect width="120" height="90" fill="#ffffff" stroke="#c6c6cd" stroke-width="1.5" rx="8" />
+    <path d="M 0 0 L 0 90" stroke="#76777d" stroke-width="4" />
+    <text x="12" y="25" font-size="9" font-weight="600" fill="#76777d" letter-spacing="0.05em">DATABASE</text>
+    <text x="12" y="45" font-size="13" font-weight="700" fill="#151c27">sqlite-vec</text>
+    <text x="12" y="65" font-size="10" font-weight="400" fill="#45464d">Stores local</text>
+    <text x="12" y="77" font-size="10" font-weight="400" fill="#45464d">embeddings &amp;</text>
+    <text x="12" y="89" font-size="10" font-weight="400" fill="#45464d">structured verdicts</text>
+  </g>
+</svg>

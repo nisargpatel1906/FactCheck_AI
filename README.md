@@ -46,6 +46,10 @@ It is built specifically for political speeches, debates, and news broadcasts, w
 6. **Judge** — a final, stronger model synthesizes the debate into one verdict, with a plain-language explanation and the actual sources used.
 7. **Surface** — the verdict appears in an on-page overlay within seconds, color-coded and ready to expand for the full explanation and citations.
 
+<div align="center">
+  <img src="agent_workflow.svg" alt="FactCheck AI Agent Workflow Diagram" width="100%" style="max-width: 850px; margin: 20px 0;">
+</div>
+
 ## Features
 
 | | |
