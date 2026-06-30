@@ -31,4 +31,6 @@ CLAIM_DETECTION_WINDOW_SECONDS = int(os.getenv("CLAIM_DETECTION_WINDOW_SECONDS",
 NUM_PIPELINE_WORKERS = int(os.getenv("NUM_PIPELINE_WORKERS", "2"))
 
 import asyncio
+# ponytail: Semaphore(1) serializes all LLM calls — intentional for NVIDIA NIM free-tier rate limits.
+# Upgrade path: increase capacity or use per-model semaphores when rate limits allow.
 llm_semaphore = asyncio.Semaphore(1)

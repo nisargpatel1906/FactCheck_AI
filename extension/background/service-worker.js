@@ -4,12 +4,16 @@ let isConnected = false;
 let hasCreatedOffscreen = false;
 const messageQueue = [];
 
+// Reconnect backoff: 1s → 2s → 4s … capped at 30s
+let reconnectDelay = 1000;
+
 function connect() {
   console.log("[Service Worker] Attempting to connect to WebSocket...");
   socket = new WebSocket("ws://localhost:8000/ws");
 
   socket.onopen = () => {
     console.log("[Service Worker] WebSocket connected successfully.");
+    reconnectDelay = 1000; // reset backoff on successful connection
     setIsConnected(true);
     
     // Flush queued messages if any exist
@@ -60,10 +64,11 @@ function connect() {
   };
 
   socket.onclose = (event) => {
-    console.log(`[Service Worker] WebSocket closed. Reason: ${event.reason}. Reconnecting in 1000ms...`);
+    console.log(`[Service Worker] WebSocket closed. Reason: ${event.reason}. Reconnecting in ${reconnectDelay}ms...`);
     setIsConnected(false);
     cleanup();
-    setTimeout(connect, 1000);
+    setTimeout(connect, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, 30000);
   };
 
   socket.onerror = (error) => {
@@ -218,39 +223,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true; // Keep message channel open for async response
 });
 
-let isCapturing = false;
-
-async function startCapture(tabId) {
-  try {
-    await setupOffscreen();
-    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
-      if (chrome.runtime.lastError) {
-        console.error("[Service Worker] Tab capture error:", chrome.runtime.lastError);
-        return;
-      }
-      console.log("[Service Worker] Got media stream ID. Sending to offscreen...");
-      setTimeout(() => {
-        chrome.runtime.sendMessage({
-          type: "start-capture",
-          streamId: streamId
-        }).catch((err) => {
-          console.error("[Service Worker] Error sending to offscreen:", err);
-        });
-      }, 500);
-      isCapturing = true;
-      chrome.storage.local.set({ audioCaptureEnabled: true, showOverlay: true });
-    });
-  } catch (error) {
-    console.error("[Service Worker] Error setting up capture:", error);
-  }
-}
-
-async function stopCapture() {
-  chrome.runtime.sendMessage({ type: "stop-capture" }).catch(() => {});
-  await closeOffscreen().catch(() => {});
-  isCapturing = false;
-  chrome.storage.local.set({ audioCaptureEnabled: false, showOverlay: false });
-}
 
 chrome.action.onClicked.addListener((tab) => {
   if (tab && tab.id) {

@@ -552,20 +552,35 @@ function addSourcesToTab(sources) {
 
   sources.forEach((src) => {
     // Avoid duplicates
-    if (container.querySelector(`a[href="${src.url}"]`)) return;
+    if (container.querySelector(`a[href="${CSS.escape(src.url)}"]`)) return;
 
     const sourceEl = document.createElement("div");
     sourceEl.className = "global-source-item";
-    sourceEl.innerHTML = `
-      <a class="source-item" href="${src.url}" target="_blank" rel="noopener noreferrer">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-        </svg>
-        <span class="source-name">${src.title || src.domain || "Source"}</span>
-        <span class="source-domain">${src.domain || ""}</span>
-      </a>
-    `;
+
+    const link = document.createElement("a");
+    link.className = "source-item";
+    link.href = src.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+
+    const iconWrap = document.createElement("span");
+    iconWrap.innerHTML =
+      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>' +
+      '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+    link.appendChild(iconWrap);
+
+    const name = document.createElement("span");
+    name.className = "source-name";
+    name.textContent = src.title || src.domain || "Source";
+    link.appendChild(name);
+
+    const domainBadge = document.createElement("span");
+    domainBadge.className = "source-domain";
+    domainBadge.textContent = src.domain || "";
+    link.appendChild(domainBadge);
+
+    sourceEl.appendChild(link);
     container.appendChild(sourceEl);
   });
 }

@@ -11,13 +11,9 @@ let outputAudio = null;
 // VAD parameters
 const SAMPLE_RATE = 16000;
 const BUFFER_SIZE = 4096;
-const RMS_THRESHOLD = 0.015; // Volume threshold to trigger speaking
-const SILENCE_TIMEOUT_MS = 5000; // 5 seconds of silence to split chunk
 const MAX_CHUNK_DURATION_MS = 60000; // 60 seconds (1 minute) to provide more context
 
 let audioBuffer = [];
-let isSpeaking = false;
-let silenceTimer = null;
 let speechStartTimestamp = null;
 let lastProgressMs = 0;
 
@@ -140,20 +136,13 @@ async function stopCapture() {
 }
 
 function flushBuffer() {
-  if (silenceTimer) {
-    clearTimeout(silenceTimer);
-    silenceTimer = null;
-  }
-
   if (audioBuffer.length === 0) {
-    isSpeaking = false;
     return;
   }
 
   const chunkBuffer = [...audioBuffer];
   audioBuffer = [];
   lastProgressMs = 0;
-  isSpeaking = false;
 
   // Convert float samples to 16-bit PCM WAV
   const wavBytes = bufferToWav(chunkBuffer, SAMPLE_RATE);

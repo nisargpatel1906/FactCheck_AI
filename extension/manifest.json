@@ -2,21 +2,24 @@
   "manifest_version": 3,
   "name": "FactCheck AI",
   "version": "1.0.0",
-  "description": "Real-time fact-checker browser extension",
+  "description": "Real-time AI fact-checker for live video and audio. Detects factual claims and verifies them against the web using a local backend.",
   "minimum_chrome_version": "116",
   "permissions": [
     "activeTab",
     "tabCapture",
     "offscreen",
     "storage",
-    "contextMenus",
     "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
   "action": {
+    "default_title": "FactCheck AI — Click to start/stop monitoring",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

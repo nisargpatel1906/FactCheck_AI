@@ -88,6 +88,8 @@ def _sync_search_cache(embedding: list[float]) -> dict | None:
     """
     Synchronous helper for database semantic matching. Runs inside an executor.
     """
+    # ponytail: new connection per call is intentional — sqlite3 connections aren't thread-safe
+    # and this runs in asyncio.to_thread(). Upgrade path: thread-local connection pool.
     try:
         conn = sqlite3.connect(config.DATABASE_PATH)
         conn.enable_load_extension(True)
@@ -139,14 +141,6 @@ async def search_cache_by_embedding(embedding: list[float]) -> dict | None:
     if not embedding:
         return None
     return await asyncio.to_thread(_sync_search_cache, embedding)
-
-async def search_cache(claim_text: str) -> dict | None:
-    """
-    Searches the SQLite cache for a semantically similar claim (> similarity threshold).
-    Returns the cached claim dictionary if found, else None.
-    """
-    embedding = await get_embedding(claim_text)
-    return await search_cache_by_embedding(embedding)
 
 def _sync_store_verdict(claim_text: str, embedding: list[float], verdict: str, explanation: str, sources: list) -> None:
     """

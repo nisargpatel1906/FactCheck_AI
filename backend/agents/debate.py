@@ -61,22 +61,13 @@ async def run_debate_round(claim_text: str, drafts: dict[str, ResearchDraft]) ->
     """
     logger.info(f"Starting collaborative debate round for claim: '{claim_text}'")
     
-    tasks = []
+    # ponytail: sequential to avoid deadlock — llm_semaphore capacity is 1
     angles = list(drafts.keys())
-    
+    revised_drafts = {}
+
     for angle in angles:
         self_draft = drafts[angle]
-        # Filter other drafts
         other_drafts = [(other, drafts[other]) for other in angles if other != angle]
-        
-        task = run_debate_for_agent(claim_text, angle, self_draft, other_drafts)
-        tasks.append(task)
-        
-    revised_results = await asyncio.gather(*tasks)
-    
-    # Reconstruct the revised drafts dict
-    revised_drafts = {}
-    for i, angle in enumerate(angles):
-        revised_drafts[angle] = revised_results[i]
-        
+        revised_drafts[angle] = await run_debate_for_agent(claim_text, angle, self_draft, other_drafts)
+
     return revised_drafts

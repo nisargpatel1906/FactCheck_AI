@@ -56,25 +56,21 @@ async def worker_loop(worker_id: int):
                     "status": "researching"
                 })
                 
-                # 2. Parallel Research
-                logger.info(f"Worker {worker_id} - Initiating parallel research for claim: '{claim_text}'")
+                # ponytail: sequential to avoid deadlock — llm_semaphore capacity is 1
+                logger.info(f"Worker {worker_id} - Running sequential research for claim: '{claim_text}'")
                 angles = ["general_news", "official_data", "fact_check_sites"]
-                research_tasks = [run_research(claim_text, angle) for angle in angles]
-                
-                results = await asyncio.gather(*research_tasks, return_exceptions=True)
                 drafts = {}
-                for i, angle in enumerate(angles):
-                    res = results[i]
-                    if isinstance(res, Exception):
-                        logger.error(f"Worker {worker_id} - Agent '{angle}' failed with exception: {res}")
+                for angle in angles:
+                    try:
+                        drafts[angle] = await run_research(claim_text, angle)
+                    except Exception as res_err:
+                        logger.error(f"Worker {worker_id} - Agent '{angle}' failed with exception: {res_err}")
                         drafts[angle] = ResearchDraft(
                             stance="missing_evidence",
                             confidence=0.0,
-                            evidence_summary=f"Research agent error: {res}",
+                            evidence_summary=f"Research agent error: {res_err}",
                             sources=[]
                         )
-                    else:
-                        drafts[angle] = res
 
                 # Check if all three research agents failed to compile evidence
                 all_failed = all(d.stance == "missing_evidence" for d in drafts.values())
