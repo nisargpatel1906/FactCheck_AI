@@ -26,3 +26,18 @@ venv/
 brainstorm_done_by_user_read_this_only_for_context/
 dev_guide_not_for_ai/
 documents/
+tests/
+
+# Logs
+logs/
+*.log
+
+# Media files
+*.mp3
+*.wav
+*.mp4
+*.m4a
+
+# OS generated files
+.DS_Store
+Thumbs.db

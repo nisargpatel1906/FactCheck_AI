@@ -40,6 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.runtime.sendMessage({
       type: "toggle-audio-capture",
       enabled: isEnabled
+    }).catch((err) => {
+      console.warn("[Popup] Failed to send toggle-audio-capture command:", err.message);
     });
   });
 
@@ -51,6 +53,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Query background script connection status
   chrome.runtime.sendMessage({ type: "get-connection-status" }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.warn("[Popup] Could not connect to background service worker:", chrome.runtime.lastError.message);
+      connectionStatus.innerText = "Disconnected";
+      connectionStatus.className = "status-pill status-disconnected";
+      return;
+    }
     if (response && response.connected) {
       connectionStatus.innerText = "Connected";
       connectionStatus.className = "status-pill status-connected";

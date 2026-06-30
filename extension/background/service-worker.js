@@ -201,4 +201,90 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true; // Keep message channel open for async response
 });
 
+let isCapturing = false;
+
+async function startCapture(tabId) {
+  try {
+    await setupOffscreen();
+    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
+      if (chrome.runtime.lastError) {
+        console.error("[Service Worker] Tab capture error:", chrome.runtime.lastError);
+        return;
+      }
+      console.log("[Service Worker] Got media stream ID. Sending to offscreen...");
+      setTimeout(() => {
+        chrome.runtime.sendMessage({
+          type: "start-capture",
+          streamId: streamId
+        }).catch((err) => {
+          console.error("[Service Worker] Error sending to offscreen:", err);
+        });
+      }, 500);
+      isCapturing = true;
+      chrome.storage.local.set({ audioCaptureEnabled: true, showOverlay: true });
+    });
+  } catch (error) {
+    console.error("[Service Worker] Error setting up capture:", error);
+  }
+}
+
+async function stopCapture() {
+  chrome.runtime.sendMessage({ type: "stop-capture" }).catch(() => {});
+  await closeOffscreen().catch(() => {});
+  isCapturing = false;
+  chrome.storage.local.set({ audioCaptureEnabled: false, showOverlay: false });
+}
+
+chrome.action.onClicked.addListener((tab) => {
+  if (tab && tab.id) {
+    if (!isCapturing) {
+      // Synchronously call getMediaStreamId to preserve the user gesture context!
+      chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id }, (streamId) => {
+        if (chrome.runtime.lastError) {
+          console.error("[Service Worker] Tab capture error:", chrome.runtime.lastError);
+          // Fallback toggle overlay even if capture fails
+          chrome.tabs.sendMessage(tab.id, { type: "set-overlay-visible", visible: true }).catch(() => {
+            chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              files: ["content/content-script.js"]
+            }).then(() => {
+              setTimeout(() => {
+                chrome.tabs.sendMessage(tab.id, { type: "set-overlay-visible", visible: true });
+              }, 100);
+            });
+          });
+          return;
+        }
+
+        console.log("[Service Worker] Synchronously obtained media stream ID on click.");
+        setupOffscreen().then(() => {
+          setTimeout(() => {
+            chrome.runtime.sendMessage({
+              type: "start-capture",
+              streamId: streamId
+            }).catch((err) => console.error(err));
+          }, 500);
+        });
+        isCapturing = true;
+        chrome.storage.local.set({ audioCaptureEnabled: true, showOverlay: true });
+
+        // Show on-page overlay
+        chrome.tabs.sendMessage(tab.id, { type: "set-overlay-visible", visible: true }).catch(() => {
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ["content/content-script.js"]
+          }).then(() => {
+            setTimeout(() => {
+              chrome.tabs.sendMessage(tab.id, { type: "set-overlay-visible", visible: true });
+            }, 100);
+          });
+        });
+      });
+    } else {
+      stopCapture();
+      chrome.tabs.sendMessage(tab.id, { type: "set-overlay-visible", visible: false }).catch(() => {});
+    }
+  }
+});
+
 connect();

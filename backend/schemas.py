@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Literal
 
 class Source(BaseModel):
     title: str = Field(description="Title of the source website or article.")
@@ -6,8 +7,8 @@ class Source(BaseModel):
     domain: str = Field(description="Domain name of the source (e.g., bls.gov, reuters.com).")
 
 class ResearchDraft(BaseModel):
-    stance: str = Field(
-        description="The research agent's stance on the claim. Must be exactly one of: 'supported', 'contradicted', 'mixed', or 'missing_evidence'."
+    stance: Literal['supported', 'contradicted', 'mixed', 'missing_evidence'] = Field(
+        description="The research agent's stance on the claim. Must be exactly one of the allowed values."
     )
     confidence: float = Field(
         description="The confidence score of the stance, from 0.0 (completely unsure) to 1.0 (fully certain)."
@@ -21,8 +22,8 @@ class ResearchDraft(BaseModel):
     )
 
 class JudgeVerdict(BaseModel):
-    verdict: str = Field(
-        description="The final verdict synthesized from all agent inputs. Must be exactly one of: 'supported', 'contradicted', 'mixed', 'unverifiable'."
+    verdict: Literal['supported', 'contradicted', 'mixed', 'unverifiable'] = Field(
+        description="The final verdict synthesized from all agent inputs. Must be exactly one of the allowed values."
     )
     explanation: str = Field(
         description="A clear, objective explanation summarizing the verdict and detailing why it was chosen based on the compiled evidence."

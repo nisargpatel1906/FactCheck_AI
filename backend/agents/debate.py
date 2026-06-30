@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import config
 from schemas import ResearchDraft
 from agents.research_agent import research_agent, AgentDeps
 
@@ -45,9 +46,10 @@ async def run_debate_for_agent(
 
     try:
         deps = AgentDeps(instructions=instr)
-        result = await research_agent.run(user_prompt, deps=deps)
-        logger.info(f"Debate round complete for '{angle}'. Stance: '{self_draft.stance}' -> '{result.data.stance}'")
-        return result.data
+        async with config.llm_semaphore:
+            result = await research_agent.run(user_prompt, deps=deps)
+        logger.info(f"Debate round complete for '{angle}'. Stance: '{self_draft.stance}' -> '{result.output.stance}'")
+        return result.output
     except Exception as e:
         logger.error(f"Agent '{angle}' debate round failed: {e}")
         return self_draft

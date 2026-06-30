@@ -1,66 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* =========================================================
+   FactCheck AI — Popup styles
+   Every value traces to a token in BRAND_GUIDE.md.
+   ========================================================= */
+
+:root {
+  /* Surfaces & text */
+  --color-surface: #f9f9ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f0f3ff;
+  --color-surface-container: #e7eefe;
+  --color-surface-container-high: #e2e8f8;
+  --color-surface-container-highest: #dce2f3;
+  --color-on-surface: #151c27;
+  --color-on-surface-variant: #45464d;
+  --color-outline: #76777d;
+  --color-outline-variant: #c6c6cd;
+
+  /* Primary / secondary */
+  --color-primary: #000000;
+  --color-on-primary: #ffffff;
+  --color-secondary: #0058be;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #2170e4;
+
+  /* Semantic */
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  --color-success: #1e8e5a;
+  --color-on-success: #ffffff;
+  --color-success-container: #dcf5e8;
+  --color-on-success-container: #0b3d26;
+  --color-warning: #a16207;
+  --color-on-warning: #ffffff;
+  --color-warning-container: #fef3d6;
+  --color-on-warning-container: #4a2e02;
+  --color-neutral-verdict: #76777d;
+
+  /* Typography */
+  --font-family-base: 'Inter', sans-serif;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --panel-width: 360px;
+
+  /* Radius */
+  --radius-sm: 0.25rem;
+  --radius-default: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-full: 9999px;
+
+  /* Elevation */
+  --shadow-panel: 0px 10px 25px rgba(0, 0, 0, 0.1);
+}
+
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  width: 320px;
-  background-color: #0f172a;
-  color: #f8fafc;
+  font-family: var(--font-family-base);
+  width: var(--panel-width);
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
 }
 
 .container {
-  padding: 16px;
+  padding: var(--space-md);
 }
 
 header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-md);
 }
 
 h1 {
-  font-size: 18px;
-  margin: 0;
+  font-family: var(--font-family-base);
+  font-size: 20px;
   font-weight: 600;
+  line-height: 28px;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--color-on-surface);
 }
 
 .status-pill {
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 12px;
+  font-family: var(--font-family-base);
+  font-size: 11px;
   font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-full);
 }
 
 .status-disconnected {
-  background-color: #ef4444;
-  color: #ffffff;
+  background-color: var(--color-error-container);
+  color: var(--color-on-error-container);
 }
 
 .status-connected {
-  background-color: #22c55e;
-  color: #ffffff;
+  background-color: var(--color-success-container);
+  color: var(--color-on-success-container);
 }
 
 .tabs {
   display: flex;
-  gap: 8px;
-  border-bottom: 1px solid #334155;
-  margin-bottom: 16px;
+  gap: var(--space-sm);
+  border-bottom: 1px solid var(--color-outline-variant);
+  margin-bottom: var(--space-md);
 }
 
 .tab-btn {
   background: none;
   border: none;
-  color: #94a3b8;
-  padding: 8px 12px;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--color-on-surface-variant);
+  padding: var(--space-sm) var(--space-md);
   cursor: pointer;
+  font-family: var(--font-family-base);
   font-size: 14px;
   font-weight: 500;
+  line-height: 20px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.tab-btn:hover {
+  background-color: var(--color-surface-container-high);
+}
+
+.tab-btn:focus {
+  outline: 1px solid var(--color-secondary);
+  outline-offset: -1px;
 }
 
 .tab-btn.active {
-  color: #38bdf8;
-  border-bottom: 2px solid #38bdf8;
+  color: var(--color-secondary);
+  border-bottom: 2px solid var(--color-secondary);
 }
 
 .panel {
@@ -73,15 +159,23 @@ h1 {
 }
 
 .placeholder-text {
-  color: #64748b;
+  font-family: var(--font-family-base);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--color-on-surface-variant);
   text-align: center;
   margin-top: 40px;
-  font-size: 14px;
 }
 
 .setting-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: var(--space-sm) 0;
+  font-family: var(--font-family-base);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--color-on-surface);
 }

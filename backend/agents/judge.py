@@ -18,6 +18,7 @@ try:
 
     judge_agent = Agent(
         model,
+        retries=3,
         output_type=JudgeVerdict,
         system_prompt=(
             "You are the Final Judge Agent of the FactCheck AI pipeline. "
@@ -67,8 +68,9 @@ async def run_judge(claim_text: str, revised_drafts: dict[str, ResearchDraft]) -
 
     logger.info(f"Running judge agent for claim: '{claim_text}'")
     try:
-        result = await judge_agent.run(user_prompt)
-        return result.data
+        async with config.llm_semaphore:
+            result = await judge_agent.run(user_prompt)
+        return result.output
     except Exception as e:
         logger.error(f"Judge agent run failed: {e}")
         return JudgeVerdict(

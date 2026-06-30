@@ -17,7 +17,8 @@ async def transcribe_audio(audio_base64: str) -> str:
         # Decode the base64 WAV payload
         audio_bytes = base64.b64decode(audio_base64)
         
-        url = f"{config.NVIDIA_BASE_URL}/audio/transcriptions"
+        # NVIDIA ASR uses the integrate.api.nvidia.com endpoint
+        url = "https://integrate.api.nvidia.com/v1/audio/transcriptions"
         headers = {
             "Authorization": f"Bearer {config.NVIDIA_API_KEY}"
         }

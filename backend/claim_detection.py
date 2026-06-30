@@ -28,6 +28,7 @@ try:
     claim_agent = Agent(
         model,
         output_type=DetectedClaims,
+        retries=2,
         system_prompt=(
             "You are an expert AI assistant specializing in analyzing transcripts of live audio or video streams "
             "and extracting checkable factual claims. A checkable claim is an assertion about a real-world entity, "
@@ -62,8 +63,9 @@ async def detect_claims(text: str) -> list[str]:
 
     try:
         logger.info(f"Running claim detection on transcript window ({len(text)} chars)...")
-        response = await claim_agent.run(text)
-        detected = response.data.claims
+        async with config.llm_semaphore:
+            response = await claim_agent.run(text)
+        detected = response.output.claims
         logger.info(f"Claim detection model returned {len(detected)} claims.")
         return [c.strip() for c in detected if c.strip()]
     except Exception as e:

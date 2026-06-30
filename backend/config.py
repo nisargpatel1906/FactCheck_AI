@@ -28,3 +28,6 @@ SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.85"))
 # Pipeline settings
 CLAIM_DETECTION_WINDOW_SECONDS = int(os.getenv("CLAIM_DETECTION_WINDOW_SECONDS", "20"))
 NUM_PIPELINE_WORKERS = int(os.getenv("NUM_PIPELINE_WORKERS", "2"))
+
+import asyncio
+llm_semaphore = asyncio.Semaphore(1)

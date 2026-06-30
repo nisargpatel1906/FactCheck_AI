@@ -109,7 +109,7 @@ def _sync_search_cache(embedding: list[float]) -> dict | None:
                 v.distance
             FROM claim_embeddings v
             JOIN claims c ON c.id = v.rowid
-            WHERE v.embedding MATCH ? AND v.distance < ?
+            WHERE v.embedding MATCH ? AND k = 1 AND v.distance < ?
             ORDER BY v.distance ASC
             LIMIT 1
         """, (json_emb, max_distance))

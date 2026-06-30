@@ -71,6 +71,7 @@ try:
 
     research_agent = Agent(
         model,
+        retries=3,
         deps_type=AgentDeps,
         output_type=ResearchDraft,
         system_prompt=(
@@ -133,8 +134,9 @@ async def run_research(claim_text: str, angle: str) -> ResearchDraft:
     deps = AgentDeps(instructions=instr)
     
     try:
-        result = await research_agent.run(claim_text, deps=deps)
-        return result.data
+        async with config.llm_semaphore:
+            result = await research_agent.run(claim_text, deps=deps)
+        return result.output
     except Exception as e:
         logger.error(f"Research agent ({angle}) execution failed: {e}")
         return ResearchDraft(

@@ -10,8 +10,21 @@ import cache
 import queue_manager
 from session import SessionState
 
+import os
+from logging.handlers import RotatingFileHandler
+
 # Set up logging configuration
-logging.basicConfig(level=logging.INFO)
+log_dir = "logs"
+os.makedirs(log_dir, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        RotatingFileHandler(os.path.join(log_dir, "backend.log"), maxBytes=5*1024*1024, backupCount=3),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger("backend")
 
 @asynccontextmanager
@@ -127,6 +140,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 if transcribed_text:
                     logger.info(f"Transcribed audio chunk to: '{transcribed_text}'")
                     await session.append_text(transcribed_text)
+                    await websocket.send_json({
+                        "type": "transcription",
+                        "text": transcribed_text
+                    })
                 else:
                     logger.info("Audio chunk transcription resolved to empty text.")
             else:
