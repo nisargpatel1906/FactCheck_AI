@@ -148,11 +148,6 @@ uvicorn main:app --host 127.0.0.1 --port 8000
 
 ```text
 FactCheck_AI/
-├── documents/
-│   ├── PRD.md               # Product Requirements Document
-│   ├── BRAND_GUIDE.md       # Brand style guide and custom assets
-│   ├── PROMPT.md            # LLM Prompt guidelines
-│   └── antigravity.md
 ├── extension/
 │   ├── manifest.json        # Extension manifest configuration
 │   ├── background/
