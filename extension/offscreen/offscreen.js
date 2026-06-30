@@ -1,5 +1,8 @@
 console.log("[Offscreen] Offscreen script initialized.");
 
+// Signal to background worker that the offscreen document is loaded and ready
+chrome.runtime.sendMessage({ type: "offscreen-ready" }).catch(() => {});
+
 let audioContext = null;
 let mediaStream = null;
 let scriptProcessor = null;
@@ -8,8 +11,8 @@ let scriptProcessor = null;
 const SAMPLE_RATE = 16000;
 const BUFFER_SIZE = 4096;
 const RMS_THRESHOLD = 0.015; // Volume threshold to trigger speaking
-const SILENCE_TIMEOUT_MS = 1000; // 1 second of silence to split chunk
-const MAX_CHUNK_DURATION_MS = 15000; // Force split at 15 seconds to avoid memory issues
+const SILENCE_TIMEOUT_MS = 5000; // 5 seconds of silence to split chunk
+const MAX_CHUNK_DURATION_MS = 60000; // 60 seconds (1 minute) to provide more context
 
 let audioBuffer = [];
 let isSpeaking = false;
