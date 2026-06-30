@@ -271,8 +271,16 @@ function setupYouTubeCaptions() {
         .trim();
         
       if (text && text !== lastCaptionText) {
+        let textToSend = text;
+        // If the new caption is just appending words to the previous one, only send the new words
+        if (lastCaptionText && text.startsWith(lastCaptionText)) {
+          textToSend = text.substring(lastCaptionText.length).trim();
+        }
+        
         lastCaptionText = text;
-        sendCaptionChunk(text);
+        if (textToSend) {
+          sendCaptionChunk(textToSend);
+        }
       }
     }
   });

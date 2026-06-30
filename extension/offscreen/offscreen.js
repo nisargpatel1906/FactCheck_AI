@@ -12,7 +12,7 @@ const SAMPLE_RATE = 16000;
 const BUFFER_SIZE = 4096;
 const RMS_THRESHOLD = 0.015; // Volume threshold to trigger speaking
 const SILENCE_TIMEOUT_MS = 5000; // 5 seconds of silence to split chunk
-const MAX_CHUNK_DURATION_MS = 60000; // 60 seconds (1 minute) to provide more context
+const MAX_CHUNK_DURATION_MS = 30000; // 30 seconds (half a minute) to provide more context without blocking too long
 
 let audioBuffer = [];
 let isSpeaking = false;
@@ -78,12 +78,12 @@ async function startCapture(streamId) {
     // Check max chunk duration constraint (exactly 1 minute / 60 seconds)
     const durationMs = (audioBuffer.length / SAMPLE_RATE) * 1000;
     if (durationMs >= MAX_CHUNK_DURATION_MS) {
-      console.log("[Offscreen] 1-minute chunk duration reached. Flushing chunk.");
+      console.log("[Offscreen] 30-second chunk duration reached. Flushing chunk.");
       flushBuffer();
     }
   };
 
-  console.log("[Offscreen] Tab audio capturing started (1-minute chunking mode).");
+  console.log("[Offscreen] Tab audio capturing started (30-second chunking mode).");
 }
 
 async function stopCapture() {
