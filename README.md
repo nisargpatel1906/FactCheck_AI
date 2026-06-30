@@ -147,24 +147,47 @@ uvicorn main:app --host 127.0.0.1 --port 8000
 ## Project Structure
 
 ```text
-factcheck-ai/
+FactCheck_AI/
+├── documents/
+│   ├── PRD.md               # Product Requirements Document
+│   ├── BRAND_GUIDE.md       # Brand style guide and custom assets
+│   ├── PROMPT.md            # LLM Prompt guidelines
+│   └── antigravity.md
 ├── extension/
-│   ├── manifest.json
-│   ├── background/        # WebSocket connection, keepalive, message relay
-│   ├── content/            # Caption reading, overlay UI (Shadow DOM)
-│   ├── offscreen/          # Tab audio capture + VAD chunking
-│   └── popup/               # Feed / Sources / Settings UI
+│   ├── manifest.json        # Extension manifest configuration
+│   ├── background/
+│   │   └── service-worker.js# WebSocket relays, keepalives, background listener
+│   ├── content/
+│   │   ├── content-script.js# Injects overlay panel into Shadow DOM
+│   │   └── overlay.css      # Isolated styles for overlay UI
+│   ├── offscreen/
+│   │   ├── offscreen.html
+│   │   └── offscreen.js     # Web Audio API tab capture and VAD chunking
+│   ├── icons/               # Logo icons (16px, 32px, 48px, 128px)
+│   └── popup/
+│       ├── popup.html
+│       ├── popup.js         # Settings & controls panel
+│       └── popup.css
 ├── backend/
-│   ├── main.py               # FastAPI app, WebSocket endpoint
-│   ├── stt.py                  # Speech-to-text (Parakeet)
-│   ├── claim_detection.py      # Claim filtering (Nemotron Nano)
-│   ├── cache.py                # Semantic cache (SQLite + sqlite-vec)
-│   ├── queue_manager.py        # Async queue / worker pool
-│   ├── agents/                  # Research, debate, and judge agents
-│   └── schemas.py               # Shared Pydantic models
-├── PRD.md
-├── BRAND_GUIDE.md
-└── README.md
+│   ├── main.py              # FastAPI app setup and WebSocket routing
+│   ├── session.py           # Client connection session state manager
+│   ├── stt.py               # Speech-to-text integration
+│   ├── claim_detection.py   # Claim validation and filtering (Nemotron Nano)
+│   ├── cache.py             # SQLite + sqlite-vec semantic cache
+│   ├── queue_manager.py     # Asynchronous processing queue worker pool
+│   ├── config.py            # Environment variables & constants configuration
+│   ├── schemas.py           # Shared Pydantic data schemas
+│   ├── requirements.txt     # Python backend dependencies
+│   ├── start.bat            # Windows script to launch backend server
+│   └── agents/
+│       ├── research_agent.py# Research logic utilizing Tavily search
+│       ├── debate.py        # Multi-agent stance debate logic
+│       └── judge.py         # Synthesizes final verdict, reasoning, and sources
+├── tests/                   # Relocated verification test scripts
+├── LICENSE                  # GNU General Public License v3.0
+├── README.md
+├── logo.png                 # Main project logo
+└── start.bat                # Root runner script to boot backend server
 ```
 
 ## Roadmap
