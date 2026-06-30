@@ -66,49 +66,24 @@ async function startCapture(streamId) {
   scriptProcessor.onaudioprocess = (event) => {
     const inputData = event.inputBuffer.getChannelData(0);
     
-    // Calculate volume RMS
-    let sum = 0;
+    if (audioBuffer.length === 0) {
+      speechStartTimestamp = Date.now();
+    }
+
+    // Append current samples to buffer
     for (let i = 0; i < inputData.length; i++) {
-      sum += inputData[i] * inputData[i];
-    }
-    const rms = Math.sqrt(sum / inputData.length);
-
-    if (rms > RMS_THRESHOLD) {
-      if (!isSpeaking) {
-        console.log("[Offscreen] Speech detected (start of chunk).");
-        isSpeaking = true;
-        speechStartTimestamp = Date.now();
-      }
-      
-      // Clear silence timer if speaking continues
-      if (silenceTimer) {
-        clearTimeout(silenceTimer);
-        silenceTimer = null;
-      }
+      audioBuffer.push(inputData[i]);
     }
 
-    if (isSpeaking) {
-      // Append current samples to buffer
-      for (let i = 0; i < inputData.length; i++) {
-        audioBuffer.push(inputData[i]);
-      }
-
-      // Check max chunk duration constraint
-      const durationMs = (audioBuffer.length / SAMPLE_RATE) * 1000;
-      if (durationMs >= MAX_CHUNK_DURATION_MS) {
-        console.log("[Offscreen] Max chunk duration reached. Flushing chunk.");
-        flushBuffer();
-      } else if (rms <= RMS_THRESHOLD && !silenceTimer) {
-        // Set silence timer to close the chunk if silence persists
-        silenceTimer = setTimeout(() => {
-          console.log("[Offscreen] Silence detected. Flushing chunk.");
-          flushBuffer();
-        }, SILENCE_TIMEOUT_MS);
-      }
+    // Check max chunk duration constraint (exactly 1 minute / 60 seconds)
+    const durationMs = (audioBuffer.length / SAMPLE_RATE) * 1000;
+    if (durationMs >= MAX_CHUNK_DURATION_MS) {
+      console.log("[Offscreen] 1-minute chunk duration reached. Flushing chunk.");
+      flushBuffer();
     }
   };
 
-  console.log("[Offscreen] Tab audio capturing started.");
+  console.log("[Offscreen] Tab audio capturing started (1-minute chunking mode).");
 }
 
 async function stopCapture() {

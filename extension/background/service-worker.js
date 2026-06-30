@@ -131,6 +131,8 @@ async function closeOffscreen() {
   hasCreatedOffscreen = false;
 }
 
+let pendingStreamId = null;
+
 // Receive messages from content script, offscreen, and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("[Service Worker] Message received:", message.type);
@@ -155,6 +157,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       timestamp_ms: message.timestamp_ms
     });
   } 
+
+  else if (message.type === "offscreen-ready") {
+    console.log("[Service Worker] Offscreen ready received. Pending stream ID:", pendingStreamId);
+    if (pendingStreamId) {
+      chrome.runtime.sendMessage({
+        type: "start-capture",
+        streamId: pendingStreamId
+      }).then(() => {
+        pendingStreamId = null;
+      }).catch((err) => {
+        console.error("[Service Worker] Error sending start-capture to offscreen:", err);
+      });
+    }
+  }
   
   else if (message.type === "toggle-audio-capture") {
     if (message.enabled) {
@@ -164,24 +180,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (!activeTab) return;
 
         try {
-          await setupOffscreen();
-          
-          chrome.tabCapture.getMediaStreamId({ targetTabId: activeTab.id }, (streamId) => {
+          chrome.tabCapture.getMediaStreamId({ targetTabId: activeTab.id }, async (streamId) => {
             if (chrome.runtime.lastError) {
               console.error("[Service Worker] Tab capture error:", chrome.runtime.lastError);
               return;
             }
             
-            console.log("[Service Worker] Got media stream ID. Sending to offscreen...");
-            // Send start command to offscreen
-            setTimeout(() => {
-              chrome.runtime.sendMessage({
-                type: "start-capture",
-                streamId: streamId
-              }).catch((err) => {
-                console.error("[Service Worker] Error sending to offscreen:", err);
-              });
-            }, 500); // Small timeout to ensure offscreen is ready
+            console.log("[Service Worker] Got media stream ID. Creating offscreen...");
+            pendingStreamId = streamId;
+            await setupOffscreen();
           });
         } catch (error) {
           console.error("[Service Worker] Error setting up capture:", error);
@@ -192,7 +199,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       chrome.runtime.sendMessage({ type: "stop-capture" }).catch(() => {});
       closeOffscreen().catch(() => {});
     }
-  } 
+  }
   
   else if (message.type === "get-connection-status") {
     sendResponse({ connected: isConnected });
@@ -256,15 +263,9 @@ chrome.action.onClicked.addListener((tab) => {
           return;
         }
 
-        console.log("[Service Worker] Synchronously obtained media stream ID on click.");
-        setupOffscreen().then(() => {
-          setTimeout(() => {
-            chrome.runtime.sendMessage({
-              type: "start-capture",
-              streamId: streamId
-            }).catch((err) => console.error(err));
-          }, 500);
-        });
+        console.log("[Service Worker] Synchronously obtained media stream ID on click. Creating offscreen...");
+        pendingStreamId = streamId;
+        setupOffscreen();
         isCapturing = true;
         chrome.storage.local.set({ audioCaptureEnabled: true, showOverlay: true });
 

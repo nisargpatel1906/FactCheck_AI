@@ -22,8 +22,16 @@ function init() {
 
   // Listen to chrome storage changes to toggle overlay on/off dynamically
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.showOverlay) {
-      toggleOverlayVisibility(changes.showOverlay.newValue);
+    if (area === "local") {
+      if (changes.showOverlay) {
+        toggleOverlayVisibility(changes.showOverlay.newValue);
+        const enableOverlayCheckbox = shadow ? shadow.getElementById("enable-overlay-overlay") : null;
+        if (enableOverlayCheckbox) enableOverlayCheckbox.checked = changes.showOverlay.newValue;
+      }
+      if (changes.audioCaptureEnabled) {
+        const enableAudioCheckbox = shadow ? shadow.getElementById("enable-audio-overlay") : null;
+        if (enableAudioCheckbox) enableAudioCheckbox.checked = changes.audioCaptureEnabled.newValue;
+      }
     }
   });
 }
@@ -151,9 +159,12 @@ function setupSidebarOverlay() {
       <span class="monitor-title">Settings</span>
     </div>
     <div class="settings-container">
-      <div class="setting-item">
-        <label for="enable-audio-overlay">Listen to tab's audio</label>
-        <input type="checkbox" id="enable-audio-overlay">
+      <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+          <label for="enable-audio-overlay">Listen to tab's audio</label>
+          <input type="checkbox" id="enable-audio-overlay" disabled>
+        </div>
+        <div style="font-size: 11px; color: #a0a0a0; line-height: 1.3; margin-top: 4px;">To start or stop audio capture, click the FactCheck AI extension icon in your Chrome toolbar.</div>
       </div>
       <div class="setting-item">
         <label for="enable-overlay-overlay">Show FactCheck Overlay</label>
@@ -201,14 +212,7 @@ function setupSidebarOverlay() {
     }
   });
   
-  enableAudioCheckbox.addEventListener("change", () => {
-    const isEnabled = enableAudioCheckbox.checked;
-    chrome.storage.local.set({ audioCaptureEnabled: isEnabled });
-    chrome.runtime.sendMessage({
-      type: "toggle-audio-capture",
-      enabled: isEnabled
-    }).catch(() => {});
-  });
+
   
   enableOverlayCheckbox.addEventListener("change", () => {
     const isEnabled = enableOverlayCheckbox.checked;
