@@ -17,8 +17,8 @@ async def transcribe_audio(audio_base64: str) -> str:
         # Decode the base64 WAV payload
         audio_bytes = base64.b64decode(audio_base64)
         
-        # Groq Whisper API endpoint
-        url = "https://api.groq.com/openai/v1/audio/transcriptions"
+        # Groq Whisper Translations API (auto-detects regional languages and translates to English)
+        url = "https://api.groq.com/openai/v1/audio/translations"
         headers = {
             "Authorization": f"Bearer {config.GROQ_API_KEY}"
         }
@@ -30,7 +30,6 @@ async def transcribe_audio(audio_base64: str) -> str:
         
         data = {
             "model": "whisper-large-v3-turbo",
-            "language": "en",
             "response_format": "json"
         }
         
