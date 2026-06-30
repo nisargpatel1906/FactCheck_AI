@@ -6,6 +6,7 @@ chrome.runtime.sendMessage({ type: "offscreen-ready" }).catch(() => {});
 let audioContext = null;
 let mediaStream = null;
 let scriptProcessor = null;
+let outputAudio = null;
 
 // VAD parameters
 const SAMPLE_RATE = 16000;
@@ -50,6 +51,11 @@ async function startCapture(streamId) {
     video: false
   });
 
+  // Play the original stream back so the user can still hear it at full quality
+  outputAudio = new Audio();
+  outputAudio.srcObject = mediaStream;
+  outputAudio.play();
+
   // Create AudioContext at 16kHz for efficient speech-to-text downsampling
   audioContext = new (window.AudioContext || window.webkitAudioContext)({
     sampleRate: SAMPLE_RATE
@@ -89,6 +95,12 @@ async function startCapture(streamId) {
 async function stopCapture() {
   console.log("[Offscreen] Stopping tab audio capture...");
   
+  if (outputAudio) {
+    outputAudio.pause();
+    outputAudio.srcObject = null;
+    outputAudio = null;
+  }
+
   if (scriptProcessor) {
     scriptProcessor.disconnect();
     scriptProcessor = null;
