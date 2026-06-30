@@ -1,6 +1,11 @@
 # Environment & Secrets
 .env
 backend/.env
+*.env
+
+# Database (local semantic cache — never commit)
+*.db
+backend/factcheck.db
 
 # Python
 __pycache__/
@@ -15,3 +20,9 @@ venv/
 .vscode/
 *.swp
 *.swo
+
+# Custom project-specific ignores
+.agents/
+brainstorm_done_by_user_read_this_only_for_context/
+dev_guide_not_for_ai/
+documents/
