@@ -90,7 +90,7 @@ Built with **FastAPI** and **Pydantic AI**, orchestrated with `asyncio`.
 | Layer | Technology |
 |---|---|
 | Language Models | Llama 3.1 via NVIDIA NIM, NV-EmbedQA |
-| Speech-to-Text | Whisper-large-v3-turbo via Groq |
+| Speech-to-Text | Whisper-large-v3 via Groq |
 | Agent Orchestration | Pydantic AI, Python `asyncio` |
 | Backend Framework | FastAPI |
 | Caching / Storage | SQLite + `sqlite-vec` |

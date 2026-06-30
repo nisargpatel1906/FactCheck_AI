@@ -29,7 +29,7 @@ async def transcribe_audio(audio_base64: str) -> str:
         }
         
         data = {
-            "model": "whisper-large-v3-turbo",
+            "model": "whisper-large-v3",
             "response_format": "json"
         }
         
