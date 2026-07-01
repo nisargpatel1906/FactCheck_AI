@@ -1,3 +1,6 @@
+if (typeof window.factCheckAiInitialized === 'undefined') {
+window.factCheckAiInitialized = true;
+
 let lastCaptionText = "";
 let captionObserver = null;
 let activeVideoElement = null;
@@ -774,3 +777,5 @@ function sendManualClaim(text) {
 
 // Run init
 init();
+
+} // End of initialization guard
