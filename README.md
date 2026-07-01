@@ -5,7 +5,7 @@
 
 **Real-time, multi-agent fact-checking for the videos you're already watching.**
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/)
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Manifest%20V3-yellow)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 [![Status: In Development](https://img.shields.io/badge/Status-In%20Development-orange)]()
@@ -211,7 +211,7 @@ Please keep pull requests focused on a single change where possible, and follow 
 
 ## License
 
-This project is licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE) for the full text.
+This project is proprietary. It is licensed under a custom **Personal & Non-Commercial License**. See [LICENSE](LICENSE) for the full text.
 
 ## Developers
 
