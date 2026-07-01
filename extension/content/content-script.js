@@ -773,7 +773,7 @@ function setupTextSelectionFactCheck() {
     const selection = window.getSelection();
     if (!selection) return;
     const text = selection.toString().trim();
-    if (text.length < 10 || text.length > 500) {
+    if (text.length < 5 || text.length > 1000) {
       removeButton();
       return;
     }
@@ -845,7 +845,7 @@ function setupTextSelectionFactCheck() {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (currentSelectedText.length >= 10 && currentSelectedText.length <= 500) {
+        if (currentSelectedText.length >= 5 && currentSelectedText.length <= 1000) {
           sendManualClaim(currentSelectedText);
           
           // Show sidebar overlay locally on the page (without saving to storage!)

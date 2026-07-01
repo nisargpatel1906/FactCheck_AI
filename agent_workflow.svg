@@ -47,7 +47,7 @@
   <path d="M 160 215 L 210 215" fill="none" stroke="#c6c6cd" stroke-width="2.5" />
   <!-- Detection -> Cache -->
   <path d="M 330 215 L 370 215" fill="none" stroke="#c6c6cd" stroke-width="2.5" />
-  <!-- Cache Hit -> Sidebar (Direct Shortcut) -->
+  <!-- Cache Hit -> Overlay UI (Direct Shortcut) -->
   <path d="M 430 175 L 430 110 L 890 110 L 890 175" fill="none" stroke="#1e8e5a" stroke-width="2.5" stroke-dasharray="6" />
   <text x="640" y="100" font-size="11" font-weight="600" fill="#1e8e5a" text-anchor="middle">SEMANTIC CACHE HIT (INSTANT RETURN)</text>
   
@@ -70,19 +70,19 @@
   <path d="M 725 410 L 490 410" fill="none" stroke="#76777d" stroke-width="2" stroke-dasharray="4" />
   <text x="600" y="400" font-size="10" font-weight="500" fill="#76777d" text-anchor="middle">Write back new verdict</text>
   
-  <!-- Judge -> Sidebar Overlay -->
+  <!-- Judge -> Floating Overlay UI -->
   <path d="M 845 410 L 890 410 L 890 255" fill="none" stroke="#1e8e5a" stroke-width="2.5" />
   
-  <!-- 1. DATA INPUT (Webpage / YouTube) -->
+  <!-- 1. DATA INPUT (Webpage / YouTube / Selection) -->
   <g class="node-card" transform="translate(40, 160)" filter="url(#shadow)">
     <rect width="120" height="110" fill="#ffffff" stroke="#c6c6cd" stroke-width="1.5" rx="8" />
     <path d="M 0 0 L 0 110" stroke="#0058be" stroke-width="4" />
     <!-- Header -->
     <text x="12" y="25" font-size="10" font-weight="600" fill="#0058be" letter-spacing="0.05em">STEP 1</text>
-    <text x="12" y="45" font-size="14" font-weight="700" fill="#151c27">Audio / CC</text>
-    <text x="12" y="65" font-size="11" font-weight="400" fill="#45464d">YouTube Captions</text>
-    <text x="12" y="80" font-size="11" font-weight="400" fill="#45464d">or Tab Capture</text>
-    <text x="12" y="95" font-size="10" font-weight="500" fill="#76777d">Real-time Stream</text>
+    <text x="12" y="45" font-size="14" font-weight="700" fill="#151c27">Data Input</text>
+    <text x="12" y="65" font-size="11" font-weight="400" fill="#45464d">Audio &amp; Tab Capture</text>
+    <text x="12" y="80" font-size="11" font-weight="400" fill="#45464d">or Text Selection</text>
+    <text x="12" y="95" font-size="10" font-weight="500" fill="#76777d">Real-time / Manual</text>
   </g>
 
   <!-- 2. CLAIM DETECTION (Nemotron Nano) -->
@@ -157,11 +157,11 @@
     <text x="12" y="80" font-size="9" font-weight="500" fill="#45464d">Verifies and explains</text>
   </g>
 
-  <!-- 7. SIDEBAR OVERLAY UI (Chrome Extension) -->
+  <!-- 7. FLOATING OVERLAY UI (Chrome Extension) -->
   <g class="node-card" transform="translate(830, 175)" filter="url(#shadow)">
     <rect width="120" height="80" fill="#ffffff" stroke="#c6c6cd" stroke-width="1.5" rx="8" />
     <path d="M 0 0 L 0 80" stroke="#1e8e5a" stroke-width="4" />
-    <text x="12" y="25" font-size="9" font-weight="600" fill="#1e8e5a" letter-spacing="0.05em">LIVE SIDEBAR</text>
+    <text x="12" y="25" font-size="9" font-weight="600" fill="#1e8e5a" letter-spacing="0.05em">FLOATING UI</text>
     <text x="12" y="45" font-size="13" font-weight="700" fill="#151c27">Veracity UI</text>
     <text x="12" y="65" font-size="9" font-weight="500" fill="#45464d">Displays verdicts &amp;</text>
     <text x="12" y="74" font-size="9" font-weight="500" fill="#45464d">cited source links</text>

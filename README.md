@@ -59,7 +59,9 @@ It is built specifically for political speeches, debates, and news broadcasts, w
 | **Collaborative Debate Round** | Agents cross-reference each other's evidence and revise their stance before a verdict is reached. |
 | **Final Judge Verdict** | A dedicated judge model synthesizes the debate into one of four clear outcomes: `SUPPORTED`, `CONTRADICTED`, `MIXED`, or `UNVERIFIABLE`. |
 | **Semantic Caching** | Uses `sqlite-vec` to instantly recall verdicts for previously checked claims via vector similarity, even when reworded — saving both time and API usage. |
-| **Non-Intrusive Overlay** | A calm, modern sidebar injected via Shadow DOM, fully style-isolated from the host page, showing a live feed of claims and verdicts. |
+| **Floating UI Overlay** | A calm, modern floating window injected via Shadow DOM, fully style-isolated from the host page, showing a live feed of claims and verdicts. |
+| **Manual Fact-Checking** | Simply highlight any text on the page (5-1000 characters) and click the pop-up icon to instantly run a fact-check on your selection. |
+| **Audio Controls** | Includes built-in recording controls (Pause, Resume, Stop) and a live timer, giving you full control over background audio capturing. |
 
 ## Architecture
 
@@ -147,8 +149,10 @@ uvicorn main:app --host 127.0.0.1 --port 8000
 ## Usage
 
 1. Open any video with spoken political or factual content (e.g. a news broadcast or speech) on YouTube.
-2. Click the FactCheck AI icon to open the overlay.
+2. Click the FactCheck AI icon to open the floating overlay.
 3. As the video plays, claims populate the feed automatically, moving through `Checking → Researching → Debating` before resolving to a final, color-coded verdict with cited sources.
+4. **Manual Mode**: Highlight any text on any webpage to instantly fact-check that specific quote.
+5. **Control Recording**: Use the Pause, Resume, or Stop buttons inside the overlay to manage background audio capturing.
 
 ## Project Structure
 
