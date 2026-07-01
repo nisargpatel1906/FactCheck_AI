@@ -1,0 +1,36 @@
+# FactCheck AI — Git Attributes
+# Ensures consistent line endings and prevents binary corruption across OS.
+
+# Default: normalize all text files to LF in the repo, checkout with OS-native endings
+* text=auto eol=lf
+
+# Shell scripts MUST always be LF — CRLF breaks the shebang on macOS/Linux
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# Binary assets — never touch line endings, never diff as text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text eol=lf
+*.webp binary
+*.mp3 binary
+*.wav binary
+*.mp4 binary
+*.m4a binary
+
+# Python source — LF everywhere
+*.py text eol=lf
+
+# JS/CSS/HTML — LF everywhere
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Config/env files — LF everywhere
+*.env text eol=lf
+*.txt text eol=lf
