@@ -1,3 +1,4 @@
+from __future__ import annotations  # allows list[float] | None syntax on Python 3.8/3.9
 import json
 import sqlite3
 import logging
@@ -18,9 +19,21 @@ def init_db():
         # Enable WAL mode for concurrency
         conn.execute("PRAGMA journal_mode=WAL;")
         
-        # Enable extension loading and load the sqlite-vec extension
-        conn.enable_load_extension(True)
+        # Enable extension loading and load the sqlite-vec extension.
+        # Note: some Python builds (Ubuntu/Debian system Python, Homebrew) compile SQLite
+        # with SQLITE_OMIT_LOAD_EXTENSION, which disables enable_load_extension().
+        # If this raises AttributeError, the user must install Python from python.org
+        # or use a venv created from a full Python build.
+        try:
+            conn.enable_load_extension(True)
+        except AttributeError:
+            raise RuntimeError(
+                "Your Python's SQLite was compiled without extension loading support.\n"
+                "Fix: install Python from https://www.python.org/downloads/ (not your OS package manager)\n"
+                "     or on macOS: use 'brew install python' then recreate the virtualenv."
+            )
         sqlite_vec.load(conn)
+        conn.enable_load_extension(False)  # re-disable for security after loading
         
         cursor = conn.cursor()
         
@@ -92,8 +105,12 @@ def _sync_search_cache(embedding: list[float]) -> dict | None:
     # and this runs in asyncio.to_thread(). Upgrade path: thread-local connection pool.
     try:
         conn = sqlite3.connect(config.DATABASE_PATH)
-        conn.enable_load_extension(True)
+        try:
+            conn.enable_load_extension(True)
+        except AttributeError:
+            raise RuntimeError("SQLite extension loading not supported. See startup error for fix.")
         sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
         cursor = conn.cursor()
         
         # Convert float list to JSON array string for MATCH operator
@@ -148,8 +165,12 @@ def _sync_store_verdict(claim_text: str, embedding: list[float], verdict: str, e
     """
     try:
         conn = sqlite3.connect(config.DATABASE_PATH)
-        conn.enable_load_extension(True)
+        try:
+            conn.enable_load_extension(True)
+        except AttributeError:
+            raise RuntimeError("SQLite extension loading not supported. See startup error for fix.")
         sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
         cursor = conn.cursor()
         
         # 1. Insert into metadata table

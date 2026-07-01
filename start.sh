@@ -50,7 +50,16 @@ fi
 echo "Activating virtual environment..."
 source .venv/bin/activate
 
-echo "Starting Uvicorn server..."
+# Check port 8000 is not already in use
+if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 || ss -tlnp 2>/dev/null | grep -q ':8000 '; then
+    echo ""
+    echo "[ERROR] Port 8000 is already in use by another process."
+    echo "Stop the other service or change the port in start.sh before launching."
+    read -p "Press enter to exit..."
+    exit 1
+fi
+
+echo "Starting Uvicorn server on http://127.0.0.1:8000 ..."
 uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 echo ""

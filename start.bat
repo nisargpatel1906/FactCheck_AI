@@ -51,7 +51,17 @@ for /f "tokens=1,2 delims==" %%a in (.env) do (
 echo Activating virtual environment...
 call .venv\Scripts\activate.bat
 
-echo Starting Uvicorn server...
+:: Check that port 8000 is not already in use
+netstat -an | find "0.0.0.0:8000" >nul 2>&1
+if not errorlevel 1 (
+    echo.
+    echo [ERROR] Port 8000 is already in use by another process.
+    echo Stop the other service or change the port in start.bat before launching.
+    pause
+    exit /b 1
+)
+
+echo Starting Uvicorn server on http://127.0.0.1:8000 ...
 uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 echo.

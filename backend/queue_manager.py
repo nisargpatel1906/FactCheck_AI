@@ -1,3 +1,4 @@
+from __future__ import annotations  # allows list[float] type hint on Python 3.8/3.9
 import logging
 import asyncio
 from fastapi import WebSocket
