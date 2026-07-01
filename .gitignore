@@ -28,6 +28,7 @@ dev_guide_not_for_ai/
 documents/
 tests/
 promo/
+desktop.ini
 
 # Logs
 logs/

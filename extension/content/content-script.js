@@ -34,6 +34,9 @@ function init() {
       }
     }
   });
+
+  // Setup text selection manual fact checking
+  setupTextSelectionFactCheck();
 }
 
 function setupSidebarOverlay() {
@@ -636,6 +639,136 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleAudioProgress(message);
   }
 });
+
+function setupTextSelectionFactCheck() {
+  let btn = null;
+
+  function removeButton() {
+    if (btn) {
+      btn.remove();
+      btn = null;
+    }
+  }
+
+  document.addEventListener('selectionchange', () => {
+    const selection = window.getSelection();
+    if (!selection) return;
+    const text = selection.toString().trim();
+    if (text.length < 10 || text.length > 500) {
+      removeButton();
+      return;
+    }
+    
+    // Check if selection is inside our sidebar
+    if (sidebarContainer && sidebarContainer.contains(selection.anchorNode)) {
+      removeButton();
+      return;
+    }
+
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "factcheck-selection-btn";
+      btn.textContent = "Fact Check";
+      btn.style.cssText = `
+        position: absolute;
+        z-index: 2147483647;
+        background: #000000;
+        color: #ffffff;
+        border: none;
+        border-radius: 0.75rem;
+        padding: 4px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        font-family: Inter, sans-serif;
+        cursor: pointer;
+        box-shadow: 0px 10px 25px rgba(0,0,0,0.1);
+        letter-spacing: 0.02em;
+      `;
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // Prevent text deselection
+        e.stopPropagation();
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const currentText = window.getSelection().toString().trim();
+        if (currentText.length >= 10 && currentText.length <= 500) {
+          sendManualClaim(currentText);
+          
+          // Show sidebar automatically if hidden
+          if (shadow && sidebarContainer) {
+            sidebarContainer.style.display = "block";
+            const sidebar = shadow.getElementById("factcheck-sidebar");
+            if (sidebar) sidebar.style.display = "flex";
+            toggleOverlayVisibility(true);
+            chrome.storage.local.set({ showOverlay: true });
+          }
+          
+          removeButton();
+          window.getSelection().removeAllRanges();
+        }
+      });
+      document.body.appendChild(btn);
+    }
+
+    // Wait a tick for bounding rect to be accurate
+    setTimeout(() => {
+      const currentSelection = window.getSelection();
+      if (currentSelection && currentSelection.rangeCount > 0 && btn) {
+        const rect = currentSelection.getRangeAt(0).getBoundingClientRect();
+        btn.style.top  = \`\${rect.top + window.scrollY - 40}px\`;
+        btn.style.left = \`\${rect.left + window.scrollX + rect.width / 2 - 50}px\`;
+      }
+    }, 0);
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (btn && !btn.contains(e.target)) {
+      removeButton();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+      const selection = window.getSelection();
+      if (!selection) return;
+      const text = selection.toString().trim();
+      
+      // Guard sidebar clicks
+      if (sidebarContainer && sidebarContainer.contains(selection.anchorNode)) {
+        return;
+      }
+      
+      if (text.length >= 10 && text.length <= 500) {
+        e.preventDefault();
+        sendManualClaim(text);
+        
+        // Show sidebar automatically if hidden
+        if (shadow && sidebarContainer) {
+          sidebarContainer.style.display = "block";
+          const sidebar = shadow.getElementById("factcheck-sidebar");
+          if (sidebar) sidebar.style.display = "flex";
+          toggleOverlayVisibility(true);
+          chrome.storage.local.set({ showOverlay: true });
+        }
+        
+        removeButton();
+        selection.removeAllRanges();
+      }
+    }
+  });
+}
+
+function sendManualClaim(text) {
+  console.log("[Content Script] Manual claim submitted:", text);
+  chrome.runtime.sendMessage({
+    type: "manual_claim",
+    text: text,
+    timestamp_ms: Date.now()
+  }).catch(err => {
+    console.error("[Content Script] Backend not connected or background worker asleep", err);
+  });
+}
 
 // Run init
 init();

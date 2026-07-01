@@ -146,6 +146,43 @@ async def websocket_endpoint(websocket: WebSocket):
                     })
                 else:
                     logger.info("Audio chunk transcription resolved to empty text.")
+            elif msg_type == "manual_claim":
+                text = data.get("text", "").strip()
+                if not text:
+                    continue
+                claim_id = f"manual_{uuid.uuid4().hex[:8]}"
+                logger.info(f"Manual claim submitted: '{text}' (ID: {claim_id})")
+            
+                embedding = await cache.get_embedding(text)
+                if not embedding:
+                    continue
+            
+                cached = await cache.search_cache_by_embedding(embedding)
+                if cached:
+                    await websocket.send_json({
+                        "type": "verdict_update",
+                        "claim_id": claim_id,
+                        "claim_text": text,
+                        "verdict": cached["verdict"],
+                        "explanation": cached["explanation"],
+                        "sources": cached["sources"],
+                        "cached": True
+                    })
+                    continue
+            
+                await websocket.send_json({
+                    "type": "status_update",
+                    "claim_id": claim_id,
+                    "claim_text": text,
+                    "status": "checking"
+                })
+                await queue_manager.enqueue_claim(
+                    claim_id=claim_id,
+                    claim_text=text,
+                    embedding=embedding,
+                    websocket=websocket,
+                    session=session
+                )
             else:
                 logger.info(f"Received generic message: {data}")
             

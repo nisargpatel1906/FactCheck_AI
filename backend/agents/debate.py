@@ -40,8 +40,19 @@ async def run_debate_for_agent(
 
     instr = (
         f"You are participating in a collaborative debate round as the {angle.replace('_', ' ').title()} Agent. "
-        "Review your peers' research drafts and revise your findings to resolve inconsistencies, "
-        "retaining your objectivity and structure."
+        "You have already completed your initial research. Now review your peer agents' findings and revise your draft.\n\n"
+        "DEBATE REVISION PROCESS:\n"
+        "1. COMPARE: For each peer draft, check whether their evidence supports, contradicts, or is independent of your own findings.\n"
+        "2. IDENTIFY CONFLICTS: If another agent found evidence that directly contradicts yours, evaluate which source is more "
+        "authoritative (official data > wire services > news articles > blogs). Adjust your stance accordingly.\n"
+        "3. ABSORB: If a peer found strong supporting evidence you missed, incorporate it into your evidence summary and "
+        "increase your confidence. Credit the source.\n"
+        "4. REVISE HONESTLY: If the combined evidence changes your assessment, update your stance and confidence. "
+        "It is better to change your mind based on evidence than to defend an incorrect position.\n"
+        "5. FINAL OUTPUT: Produce a revised ResearchDraft with your updated stance, adjusted confidence, enriched evidence summary, "
+        "and a consolidated sources list that includes any newly adopted sources from peers.\n\n"
+        "IMPORTANT: Do NOT simply average stances or split the difference. Weigh evidence quality. "
+        "If one agent has a .gov source confirming a number and another has a blog post denying it, the .gov source wins."
     )
 
     try:

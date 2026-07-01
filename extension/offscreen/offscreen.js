@@ -12,10 +12,14 @@ let outputAudio = null;
 const SAMPLE_RATE = 16000;
 const BUFFER_SIZE = 4096;
 const MAX_CHUNK_DURATION_MS = 60000; // 60 seconds (1 minute) to provide more context
+// Minimum RMS amplitude to consider a buffer frame as containing speech.
+// Whisper hallucinates on silence — discard chunks below this floor.
+const SPEECH_RMS_THRESHOLD = 0.01;
 
 let audioBuffer = [];
 let speechStartTimestamp = null;
 let lastProgressMs = 0;
+let chunkHasSpeech = false; // true once any frame in the current chunk exceeds the RMS threshold
 
 // Listen for messages from background service worker
 chrome.runtime.onMessage.addListener(async (message) => {
@@ -76,6 +80,16 @@ async function startCapture(streamId) {
     // Append current samples to buffer
     for (let i = 0; i < inputData.length; i++) {
       audioBuffer.push(inputData[i]);
+    }
+
+    // Check if this frame contains speech via RMS
+    if (!chunkHasSpeech) {
+      let sumSq = 0;
+      for (let i = 0; i < inputData.length; i++) sumSq += inputData[i] * inputData[i];
+      const rms = Math.sqrt(sumSq / inputData.length);
+      if (rms >= SPEECH_RMS_THRESHOLD) {
+        chunkHasSpeech = true;
+      }
     }
 
     // Check max chunk duration constraint (exactly 1 minute / 60 seconds)
@@ -140,9 +154,17 @@ function flushBuffer() {
     return;
   }
 
+  const hadSpeech = chunkHasSpeech;
   const chunkBuffer = [...audioBuffer];
   audioBuffer = [];
   lastProgressMs = 0;
+  chunkHasSpeech = false;
+
+  if (!hadSpeech) {
+    // ponytail: discard silent chunk — Whisper hallucinates on silence/background noise
+    console.log("[Offscreen] Chunk discarded: no speech detected (below RMS threshold).");
+    return;
+  }
 
   // Convert float samples to 16-bit PCM WAV
   const wavBytes = bufferToWav(chunkBuffer, SAMPLE_RATE);

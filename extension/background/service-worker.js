@@ -152,6 +152,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
   } 
   
+  else if (message.type === "manual_claim") {
+    // Forward manual selection claims directly to WebSocket
+    sendToWebSocket({
+      type: "manual_claim",
+      session_id: "session_local",
+      text: message.text,
+      timestamp_ms: message.timestamp_ms
+    });
+  }
+  
   else if (message.type === "audio_chunk") {
     // Forward audio chunk base64 directly to WebSocket
     sendToWebSocket({
