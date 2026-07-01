@@ -18,7 +18,12 @@ function init() {
   const navObserver = new MutationObserver(() => {
     checkForVideoAndSetup();
   });
-  navObserver.observe(document.body, { childList: true, subtree: true });
+  
+  if (document.body) {
+    navObserver.observe(document.body, { childList: true, subtree: true });
+  } else {
+    navObserver.observe(document.documentElement, { childList: true, subtree: true });
+  }
 
   // Initialize shadow-dom overlay sidebar
   setupSidebarOverlay();
@@ -44,6 +49,11 @@ function init() {
 
 function setupSidebarOverlay() {
   if (sidebarContainer) return;
+  if (!document.body) {
+    // If injected before body exists (e.g. some SPA frameworks or weird frames), wait and retry
+    setTimeout(setupSidebarOverlay, 100);
+    return;
+  }
 
   console.log("[Content Script] Setting up Shadow DOM Sidebar overlay...");
   sidebarContainer = document.createElement("div");
@@ -713,7 +723,9 @@ function setupTextSelectionFactCheck() {
           window.getSelection().removeAllRanges();
         }
       });
-      document.body.appendChild(btn);
+      if (document.body) {
+        document.body.appendChild(btn);
+      }
     }
 
     // Wait a tick for bounding rect to be accurate
