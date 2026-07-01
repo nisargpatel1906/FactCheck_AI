@@ -16,11 +16,11 @@ NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com
 
 # NVIDIA NIM Models — verify current IDs at build.nvidia.com before first use
 # PRD section 12.2: Nano for claim detection, Super for research, Ultra for judge
-MODEL_CLAIM_DETECTION = os.getenv("MODEL_CLAIM_DETECTION", "nvidia/llama-3.1-nemotron-nano-8b-v1")
-MODEL_RESEARCH = os.getenv("MODEL_RESEARCH", "nvidia/llama-3.1-nemotron-super-49b-v1")
-MODEL_JUDGE = os.getenv("MODEL_JUDGE", "nvidia/llama-3.1-nemotron-ultra-253b-v1")
+MODEL_CLAIM_DETECTION = os.getenv("MODEL_CLAIM_DETECTION", "meta/llama-3.1-8b-instruct")
+MODEL_RESEARCH = os.getenv("MODEL_RESEARCH", "meta/llama-3.1-8b-instruct")
+MODEL_JUDGE = os.getenv("MODEL_JUDGE", "meta/llama-3.1-8b-instruct")
 MODEL_EMBEDDING = os.getenv("MODEL_EMBEDDING", "nvidia/nv-embedqa-e5-v5")
-MODEL_STT = os.getenv("MODEL_STT", "nvidia/parakeet-ctc-1.1b-asr")
+MODEL_STT = os.getenv("MODEL_STT", "openai/whisper-large-v3")
 
 # Cache & Storage
 DATABASE_PATH = os.getenv("DATABASE_PATH", str(BASE_DIR / "factcheck.db"))
