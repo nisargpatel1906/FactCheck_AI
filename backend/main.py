@@ -135,6 +135,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 timestamp = data.get("timestamp_ms")
                 logger.info(f"Received audio chunk at {timestamp}: base64 len={len(audio_base64)}, format={fmt}")
                 
+                if not audio_base64:
+                    logger.warning("Received empty audio chunk, skipping transcription.")
+                    continue
+                
                 # Perform transcription
                 transcribed_text = await stt.transcribe_audio(audio_base64)
                 if transcribed_text:

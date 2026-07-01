@@ -34,8 +34,8 @@ async def worker_loop(worker_id: int):
     Worker task pulling claims from queue and running the multi-agent pipeline.
     """
     logger.info(f"Starting pipeline worker {worker_id}")
-    try:
-        while True:
+    while True:
+        try:
             # Pull job from queue
             claim_id, claim_text, embedding, websocket, session = await pipeline_queue.get()
             logger.info(f"Worker {worker_id} - Processing claim: '{claim_text}'")
@@ -141,10 +141,12 @@ async def worker_loop(worker_id: int):
                 pipeline_queue.task_done()
                 logger.info(f"Worker {worker_id} - Finished processing claim: '{claim_text}'")
 
-    except asyncio.CancelledError:
-        logger.info(f"Worker {worker_id} cancelled.")
-    except Exception as e:
-        logger.error(f"Worker {worker_id} encountered exception: {e}")
+        except asyncio.CancelledError:
+            logger.info(f"Worker {worker_id} cancelled.")
+            break
+        except Exception as e:
+            logger.error(f"Worker {worker_id} encountered unexpected exception: {e}")
+            await asyncio.sleep(1) # Prevent tight crash loop
 
 def start_workers():
     """
