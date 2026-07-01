@@ -554,8 +554,9 @@ function addSourcesToTab(sources) {
   }
 
   sources.forEach((src) => {
-    // Avoid duplicates
-    if (container.querySelector(`a[href="${CSS.escape(src.url)}"]`)) return;
+    // Avoid duplicates — use data-url attribute, not CSS.escape(url) in querySelector
+    // (CSS.escape on URLs produces double-escaping that breaks the selector match)
+    if (container.querySelector(`[data-url="${src.url.replace(/"/g, '&quot;')}"]`)) return;
 
     const sourceEl = document.createElement("div");
     sourceEl.className = "global-source-item";
@@ -565,6 +566,7 @@ function addSourcesToTab(sources) {
     link.href = src.url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
+    link.setAttribute("data-url", src.url);  // used for dedup check above
 
     const iconWrap = document.createElement("span");
     iconWrap.innerHTML =
