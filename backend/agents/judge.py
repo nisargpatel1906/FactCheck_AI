@@ -11,7 +11,8 @@ logger = logging.getLogger("backend.judge")
 try:
     openai_client = AsyncOpenAI(
         base_url=config.NVIDIA_BASE_URL,
-        api_key=config.NVIDIA_API_KEY
+        api_key=config.NVIDIA_API_KEY,
+        timeout=20.0
     )
     provider = OpenAIProvider(openai_client=openai_client)
     model = OpenAIChatModel(config.MODEL_JUDGE, provider=provider)

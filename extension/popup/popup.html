@@ -6,36 +6,81 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>FactCheck AI</h1>
-      <span class="status-pill status-disconnected" id="connection-status">Disconnected</span>
-    </header>
-    
-    <div class="tabs">
-      <button class="tab-btn active" id="tab-feed">Feed</button>
-      <button class="tab-btn" id="tab-sources">Sources</button>
-      <button class="tab-btn" id="tab-settings">Settings</button>
+  <div class="popup-container">
+    <!-- Left Navigation Strip -->
+    <div class="sidebar-nav">
+      <button class="tab-btn active" id="tab-feed">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span>Feed</span>
+      </button>
+      <button class="tab-btn" id="tab-sources">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span>Sources</span>
+      </button>
+      <button class="tab-btn" id="tab-settings">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </button>
     </div>
 
-    <main class="tab-content">
-      <div id="feed-panel" class="panel">
-        <p class="placeholder-text">Waiting for claims to check...</p>
-      </div>
-      <div id="sources-panel" class="panel hidden">
-        <p class="placeholder-text">Sources will appear here.</p>
-      </div>
-      <div id="settings-panel" class="panel hidden">
-        <div class="setting-item">
-          <label for="enable-audio">Listen to tab's audio</label>
-          <input type="checkbox" id="enable-audio">
+    <!-- Right Panel Content -->
+    <div class="sidebar-content">
+      <header class="sidebar-header">
+        <span class="brand-title">FactCheck AI</span>
+        <div class="header-actions">
+          <button class="header-action-btn" id="menu-btn" title="Menu">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          <button class="header-action-btn power-btn power-off" id="power-toggle-btn" title="Toggle Monitoring">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+          </button>
         </div>
-        <div class="setting-item">
-          <label for="enable-overlay">Show FactCheck Overlay</label>
-          <input type="checkbox" id="enable-overlay" checked>
+      </header>
+
+      <main class="content-body">
+        <div id="feed-panel" class="panel">
+          <div class="live-monitor-header">
+            <span class="monitor-title">Live Monitor - Scanning</span>
+            <span class="active-pill"><span class="active-pill__dot"></span>Active</span>
+          </div>
+          <p class="monitor-subtitle">Scanning active tab</p>
+          <div class="recording-timer" id="recording-timer" style="display: none; font-size: 12px; font-weight: 500; color: var(--color-secondary); margin-top: 8px;"></div>
+          
+          <div class="live-transcribe-box hidden" id="live-transcribe">
+            <div class="transcribe-title">LIVE TRANSCRIPT</div>
+            <div class="transcribe-text" id="live-transcribe-text"></div>
+          </div>
+          
+          <div class="claims-section-title">ACTIVE CLAIMS</div>
+          <div class="claims-list" id="active-claims"></div>
+          
+          <div class="section-title">PREVIOUS RESULTS</div>
+          <div class="claims-list" id="previous-claims"></div>
         </div>
-      </div>
-    </main>
+        
+        <div id="sources-panel" class="panel hidden">
+          <div class="sources-list" id="sources-list-container">
+            <p class="placeholder-text">Sources from verified claims will appear here.</p>
+          </div>
+        </div>
+        
+        <div id="settings-panel" class="panel hidden">
+          <div class="settings-container">
+            <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+              <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                <label for="enable-audio">Listen to tab's audio</label>
+                <input type="checkbox" id="enable-audio" disabled>
+              </div>
+              <div style="font-size: 11px; color: var(--color-on-surface-variant); line-height: 1.3; margin-top: 4px;">To start or stop audio capture, click the FactCheck AI extension icon in your Chrome toolbar.</div>
+            </div>
+            <div class="setting-item">
+              <label for="enable-overlay">Show FactCheck Overlay</label>
+              <input type="checkbox" id="enable-overlay" checked>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
   </div>
   <script src="popup.js"></script>
 </body>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FactCheck AI - Selection Test Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      line-height: 1.6;
+      padding: 0 20px;
+    }
+    .test-box {
+      border: 2px dashed #ccc;
+      padding: 20px;
+      border-radius: 8px;
+      background: #fcfcfc;
+      margin-bottom: 20px;
+    }
+    #log {
+      margin-top: 20px;
+      padding: 10px;
+      background: #333;
+      color: #fff;
+      font-family: monospace;
+      border-radius: 4px;
+      min-height: 50px;
+      white-space: pre-wrap;
+    }
+  </style>
+  <script>
+    // Mock the Chrome Extension API
+    const chromeListeners = [];
+    const storageListeners = [];
+    
+    window.chrome = {
+      runtime: {
+        getURL: (path) => path,
+        sendMessage: (msg) => {
+          console.log("[Mock sendMessage]", msg);
+          const logDiv = document.getElementById("log");
+          if (logDiv) {
+            logDiv.textContent = "Sent Message:\n" + JSON.stringify(msg, null, 2);
+          }
+          return Promise.resolve({ success: true });
+        },
+        onMessage: {
+          addListener: (cb) => {
+            chromeListeners.push(cb);
+          }
+        }
+      },
+      storage: {
+        local: {
+          get: (keys, cb) => {
+            // Provide default values
+            cb({ audioCaptureEnabled: false, showOverlay: true });
+          },
+          set: (vals, cb) => {
+            console.log("[Mock storage.set]", vals);
+            if (cb) cb();
+            // Trigger storage listeners
+            storageListeners.forEach(listener => {
+              const changes = {};
+              for (const k in vals) {
+                changes[k] = { newValue: vals[k] };
+              }
+              listener(changes, "local");
+            });
+          }
+        },
+        onChanged: {
+          addListener: (cb) => {
+            storageListeners.push(cb);
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body>
+  <h1>FactCheck AI: Text Selection Test</h1>
+  <p>This is a local mock page created to test the text selection and floating bubble feature of the chrome extension.</p>
+  
+  <div class="test-box">
+    <h3>Please select some text in the box below:</h3>
+    <p id="target-text">
+      Nitin Gadkari gave an open challenge in Parliament, claiming that there is no car in India without ethanol. 
+      Furthermore, he asserted that E20 fuel is 100% safe for all vehicles on the road, despite companies writing 
+      different compatibility warnings on the fuel tanks.
+    </p>
+  </div>
+
+  <h3>Extension Messages Log:</h3>
+  <div id="log">No messages sent yet. Highlight text and click the bubble to test.</div>
+
+  <!-- Load the content script -->
+  <script src="content/content-script.js"></script>
+</body>
+</html>

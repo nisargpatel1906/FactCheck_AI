@@ -20,6 +20,7 @@ let audioBuffer = [];
 let speechStartTimestamp = null;
 let lastProgressMs = 0;
 let chunkHasSpeech = false; // true once any frame in the current chunk exceeds the RMS threshold
+let isPaused = false;
 
 // Listen for messages from background service worker
 chrome.runtime.onMessage.addListener(async (message) => {
@@ -35,6 +36,14 @@ chrome.runtime.onMessage.addListener(async (message) => {
     }
   } else if (message.type === "stop-capture") {
     await stopCapture();
+  } else if (message.type === "pause-capture") {
+    isPaused = true;
+    if (outputAudio) outputAudio.pause();
+    console.log("[Offscreen] Audio capture paused.");
+  } else if (message.type === "resume-capture") {
+    isPaused = false;
+    if (outputAudio) outputAudio.play().catch(()=>{});
+    console.log("[Offscreen] Audio capture resumed.");
   }
 });
 
@@ -71,6 +80,8 @@ async function startCapture(streamId) {
   scriptProcessor.connect(audioContext.destination);
 
   scriptProcessor.onaudioprocess = (event) => {
+    if (isPaused) return;
+    
     const inputData = event.inputBuffer.getChannelData(0);
     
     if (audioBuffer.length === 0) {

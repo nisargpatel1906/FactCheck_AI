@@ -48,14 +48,20 @@ async def search_web(query: str) -> str:
     try:
         logger.info(f"Searching DuckDuckGo for: '{query}'")
         def ddg_sync():
-            with DDGS() as ddgs:
-                # Limit results to keep context concise
-                return list(ddgs.text(query, max_results=3))
-        results = await asyncio.to_thread(ddg_sync)
+            try:
+                with DDGS(timeout=10) as ddgs:
+                    return list(ddgs.text(query, max_results=3))
+            except TypeError:
+                with DDGS() as ddgs:
+                    return list(ddgs.text(query, max_results=3))
+        results = await asyncio.wait_for(asyncio.to_thread(ddg_sync), timeout=12.0)
         formatted = []
         for r in results:
             formatted.append(f"Title: {r.get('title')}\nURL: {r.get('href')}\nContent: {r.get('body')}\n")
         return "\n".join(formatted)
+    except asyncio.TimeoutError:
+        logger.error(f"DuckDuckGo search timed out after 12 seconds.")
+        return "Search timed out."
     except Exception as e:
         logger.error(f"DuckDuckGo search failed: {e}")
         return "No search results found."
@@ -64,7 +70,8 @@ async def search_web(query: str) -> str:
 try:
     openai_client = AsyncOpenAI(
         base_url=config.NVIDIA_BASE_URL,
-        api_key=config.NVIDIA_API_KEY
+        api_key=config.NVIDIA_API_KEY,
+        timeout=20.0
     )
     provider = OpenAIProvider(openai_client=openai_client)
     model = OpenAIChatModel(config.MODEL_RESEARCH, provider=provider)

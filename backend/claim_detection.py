@@ -19,7 +19,8 @@ class DetectedClaims(BaseModel):
 try:
     openai_client = AsyncOpenAI(
         base_url=config.NVIDIA_BASE_URL,
-        api_key=config.NVIDIA_API_KEY
+        api_key=config.NVIDIA_API_KEY,
+        timeout=20.0
     )
     provider = OpenAIProvider(openai_client=openai_client)
     model = OpenAIChatModel(config.MODEL_CLAIM_DETECTION, provider=provider)
@@ -52,12 +53,12 @@ try:
             "embed that geographical context explicitly (e.g. 'The Prime Minister of India' not 'The Prime Minister').\n"
             "4. Preserve temporal context — include time references mentioned by the speaker (e.g. 'last year', 'in 2023', 'this quarter'). "
             "If the speaker says 'last year' and the current context year is known, retain the relative phrasing.\n"
-            "5. Do NOT over-fragment. If a sentence contains multiple related facts forming a single logical narrative, "
-            "extract it as ONE comprehensive claim. Only split when two genuinely independent facts happen to share a sentence.\n"
+            "5. SYNTHESIZE AND CONSOLIDATE: Do NOT atomize the speaker's narrative into multiple minor claims. "
+            "If the speaker is making a single broader argument containing several related facts (e.g., 'E15 fuel damages cars by clogging tanks, ruining injectors, and reducing efficiency to 9-10'), "
+            "you MUST combine these related points into ONE comprehensive claim to fact-check the overall narrative.\n"
             "6. Do NOT duplicate — if the same fact is restated or paraphrased within the transcript window, extract it only once in its most complete form.\n"
-            "7. When multiple speakers are present (e.g. a debate), attribute the claim to the speaker if identifiable from context "
-            "(e.g. 'Candidate A claimed that unemployment fell to 3.5%').\n"
-            "8. Maximum 5 claims per transcript window. Prioritize the most specific, most verifiable claims if more are present."
+            "7. When multiple speakers are present (e.g. a debate), attribute the claim to the speaker if identifiable from context.\n"
+            "8. MAXIMUM EFFICIENCY: Return a maximum of 1 or 2 core claims per transcript window. Focus entirely on the central, most critical verifiable assertion being made."
         )
     )
 except Exception as e:

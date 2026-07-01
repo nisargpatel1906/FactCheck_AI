@@ -28,14 +28,9 @@ function init() {
   // Initialize shadow-dom overlay sidebar
   setupSidebarOverlay();
 
-  // Listen to chrome storage changes to toggle overlay on/off dynamically
+  // Listen to chrome storage changes for audioCaptureEnabled
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local") {
-      if (changes.showOverlay) {
-        toggleOverlayVisibility(changes.showOverlay.newValue);
-        const enableOverlayCheckbox = shadow ? shadow.getElementById("enable-overlay-overlay") : null;
-        if (enableOverlayCheckbox) enableOverlayCheckbox.checked = changes.showOverlay.newValue;
-      }
       if (changes.audioCaptureEnabled) {
         const enableAudioCheckbox = shadow ? shadow.getElementById("enable-audio-overlay") : null;
         if (enableAudioCheckbox) enableAudioCheckbox.checked = changes.audioCaptureEnabled.newValue;
@@ -139,7 +134,21 @@ function setupSidebarOverlay() {
       <span class="active-pill"><span class="active-pill__dot"></span>Active</span>
     </div>
     <p class="monitor-subtitle">Scanning active tab</p>
-    <div class="recording-timer" id="recording-timer" style="display: none; font-size: 12px; font-weight: 500; color: var(--accent-blue, #3a86ff); margin-top: 8px;"></div>
+    
+    <div class="recording-controls" id="recording-controls" style="display: none; align-items: center; justify-content: space-between; background: var(--color-surface-container-low); border: 1px solid var(--color-outline-variant); border-radius: var(--radius-default); padding: var(--space-sm) var(--space-md); margin-top: var(--space-sm);">
+      <div style="display: flex; align-items: center; gap: var(--space-sm);">
+        <span class="pulse-dot" style="width: 8px; height: 8px; background: var(--color-error); border-radius: 50%;"></span>
+        <div class="recording-timer" id="recording-timer" style="font-size: 13px; font-weight: 600; color: var(--color-on-surface);">Recording: 0s</div>
+      </div>
+      <div style="display: flex; gap: var(--space-sm);">
+        <button id="recording-pause-btn" class="control-btn" title="Pause" style="background: none; border: none; cursor: pointer; color: var(--color-on-surface-variant); padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+        </button>
+        <button id="recording-stop-btn" class="control-btn" title="Stop" style="background: none; border: none; cursor: pointer; color: var(--color-on-surface-variant); padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16"></rect></svg>
+        </button>
+      </div>
+    </div>
     
     <div class="live-transcribe-box hidden" id="live-transcribe">
       <div class="transcribe-title">LIVE TRANSCRIPT</div>
@@ -180,9 +189,9 @@ function setupSidebarOverlay() {
       <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
         <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
           <label for="enable-audio-overlay">Listen to tab's audio</label>
-          <input type="checkbox" id="enable-audio-overlay" disabled>
+          <input type="checkbox" id="enable-audio-overlay">
         </div>
-        <div style="font-size: 11px; color: #a0a0a0; line-height: 1.3; margin-top: 4px;">To start or stop audio capture, click the FactCheck AI extension icon in your Chrome toolbar.</div>
+        <div style="font-size: 11px; color: var(--color-on-surface-variant); line-height: 1.3; margin-top: 4px;">Click the extension icon again (close & reopen) to apply changes to audio capture.</div>
       </div>
       <div class="setting-item">
         <label for="enable-overlay-overlay">Show FactCheck Overlay</label>
@@ -194,9 +203,52 @@ function setupSidebarOverlay() {
   
   content.appendChild(contentBody);
   sidebar.appendChild(content);
+  
+  // Resize Handle
+  const resizeHandle = document.createElement("div");
+  resizeHandle.className = "resize-handle";
+  sidebar.appendChild(resizeHandle);
+  
   shadow.appendChild(sidebar);
   
   document.body.appendChild(sidebarContainer);
+  
+  let isResizing = false;
+  let startX;
+  let startWidth;
+  
+  resizeHandle.addEventListener("mousedown", (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = parseInt(getComputedStyle(sidebar).width, 10) || 360;
+    resizeHandle.classList.add("active");
+    sidebar.style.transition = "none";
+    document.documentElement.style.transition = "none";
+    document.body.style.userSelect = "none"; // Prevent text selection while resizing
+    e.preventDefault();
+  });
+  
+  document.addEventListener("mousemove", (e) => {
+    if (!isResizing) return;
+    const newWidth = startWidth - (e.clientX - startX);
+    if (newWidth > 280 && newWidth < 800) {
+      sidebar.style.width = newWidth + "px";
+      sidebarContainer.style.setProperty("--panel-width", newWidth + "px");
+      if (sidebar.style.display !== "none") {
+        document.documentElement.style.marginRight = newWidth + "px";
+      }
+    }
+  });
+  
+  document.addEventListener("mouseup", () => {
+    if (isResizing) {
+      isResizing = false;
+      resizeHandle.classList.remove("active");
+      sidebar.style.transition = "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)";
+      document.documentElement.style.transition = "margin-right 0.35s cubic-bezier(0.16, 1, 0.3, 1)";
+      document.body.style.userSelect = "";
+    }
+  });
   
   // Tab interactions
   const tabs = [btnFeed, btnSources, btnSettings];
@@ -213,39 +265,87 @@ function setupSidebarOverlay() {
   // Shutdown Power Button
   const powerBtn = shadow.getElementById("power-shutdown-btn");
   powerBtn.addEventListener("click", () => {
+    const enableOverlayCheckbox = shadow.getElementById("enable-overlay-overlay");
+    enableOverlayCheckbox.checked = false;
     toggleOverlayVisibility(false);
-    chrome.storage.local.set({ showOverlay: false });
   });
   
   // Settings checkbox listeners
   const enableAudioCheckbox = shadow.getElementById("enable-audio-overlay");
   const enableOverlayCheckbox = shadow.getElementById("enable-overlay-overlay");
   
-  chrome.storage.local.get(["audioCaptureEnabled", "showOverlay"], (result) => {
+  chrome.storage.local.get(["audioCaptureEnabled"], (result) => {
     if (result.audioCaptureEnabled !== undefined) {
       enableAudioCheckbox.checked = result.audioCaptureEnabled;
     }
     
-    // Default to false if not yet set
-    const shouldShow = result.showOverlay === true;
-    enableOverlayCheckbox.checked = shouldShow;
-    toggleOverlayVisibility(shouldShow);
+    // Always start with overlay hidden on page load/reload
+    enableOverlayCheckbox.checked = false;
+    toggleOverlayVisibility(false);
   });
   
-
+  enableAudioCheckbox.addEventListener("change", () => {
+    const isEnabled = enableAudioCheckbox.checked;
+    chrome.storage.local.set({ audioCaptureEnabled: isEnabled });
+    chrome.runtime.sendMessage({ type: "toggle-audio-capture", enabled: isEnabled }).catch(() => {});
+  });
   
   enableOverlayCheckbox.addEventListener("change", () => {
     const isEnabled = enableOverlayCheckbox.checked;
-    chrome.storage.local.set({ showOverlay: isEnabled });
     toggleOverlayVisibility(isEnabled);
   });
+
+  // Recording controls listener
+  let isRecordingPaused = false;
+  const recPauseBtn = shadow.getElementById("recording-pause-btn");
+  const recStopBtn = shadow.getElementById("recording-stop-btn");
+  
+  if (recPauseBtn) {
+    recPauseBtn.addEventListener("click", () => {
+      isRecordingPaused = !isRecordingPaused;
+      if (isRecordingPaused) {
+        chrome.runtime.sendMessage({ type: "pause-audio-capture" }).catch(() => {});
+        recPauseBtn.title = "Resume";
+        recPauseBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+      } else {
+        chrome.runtime.sendMessage({ type: "resume-audio-capture" }).catch(() => {});
+        recPauseBtn.title = "Pause";
+        recPauseBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+      }
+    });
+  }
+  
+  if (recStopBtn) {
+    recStopBtn.addEventListener("click", () => {
+      chrome.storage.local.set({ audioCaptureEnabled: false });
+      chrome.runtime.sendMessage({ type: "toggle-audio-capture", enabled: false }).catch(() => {});
+      const enableAudioCheckbox = shadow.getElementById("enable-audio-overlay");
+      if (enableAudioCheckbox) enableAudioCheckbox.checked = false;
+    });
+  }
 }
 
 function toggleOverlayVisibility(visible) {
   if (!shadow) return;
   const sidebar = shadow.getElementById("factcheck-sidebar");
   if (sidebar) {
-    sidebar.style.display = visible ? "flex" : "none";
+    if (visible) {
+      sidebar.style.display = "flex";
+      sidebar.style.transform = "translateX(0)";
+      const currentWidth = parseInt(getComputedStyle(sidebar).width, 10) || 360;
+      document.documentElement.style.transition = "margin-right 0.35s cubic-bezier(0.16, 1, 0.3, 1)";
+      document.documentElement.style.marginRight = currentWidth + "px";
+    } else {
+      sidebar.style.transform = "translateX(100%)";
+      document.documentElement.style.transition = "margin-right 0.35s cubic-bezier(0.16, 1, 0.3, 1)";
+      document.documentElement.style.marginRight = "0";
+      setTimeout(() => {
+        // Double check it's still supposed to be hidden after transition
+        if (sidebar.style.transform === "translateX(100%)") {
+          sidebar.style.display = "none";
+        }
+      }, 350);
+    }
     console.log(`[Content Script] Overlay visibility toggled to: ${visible}`);
   }
 }
@@ -620,15 +720,16 @@ function handleTranscriptionUpdate(data) {
 function handleAudioProgress(data) {
   setupSidebarOverlay();
   if (!shadow) return;
+  const controlsEl = shadow.getElementById("recording-controls");
   const timerEl = shadow.getElementById("recording-timer");
-  if (!timerEl) return;
+  if (!controlsEl || !timerEl) return;
   
   if (data.durationMs === 0) {
-     timerEl.style.display = "none";
+     controlsEl.style.display = "none";
   } else {
-     timerEl.style.display = "block";
+     controlsEl.style.display = "flex";
      const timeLeft = Math.max(0, Math.ceil((data.maxMs - data.durationMs) / 1000));
-     timerEl.innerText = `Recording audio... Sending chunk in ${timeLeft}s`;
+     timerEl.innerText = `Recording: ${timeLeft}s`;
   }
 }
 
@@ -637,11 +738,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "ping") {
     sendResponse({ status: "alive" });
   } else if (message.type === "toggle-overlay") {
-    chrome.storage.local.get(["showOverlay"], (result) => {
-      const current = result.showOverlay !== false;
-      chrome.storage.local.set({ showOverlay: !current });
+    if (shadow) {
+      const enableOverlayCheckbox = shadow.getElementById("enable-overlay-overlay");
+      const current = enableOverlayCheckbox.checked;
+      enableOverlayCheckbox.checked = !current;
       toggleOverlayVisibility(!current);
-    });
+      sendResponse({ visible: !current });
+    }
   } else if (message.type === "set-overlay-visible") {
     toggleOverlayVisibility(message.visible);
   } else if (message.type === "status_update") {
@@ -657,6 +760,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 function setupTextSelectionFactCheck() {
   let btn = null;
+  let currentSelectedText = "";
 
   function removeButton() {
     if (btn) {
@@ -674,6 +778,8 @@ function setupTextSelectionFactCheck() {
       return;
     }
     
+    currentSelectedText = text;
+
     // Check if selection is inside our sidebar
     if (sidebarContainer && sidebarContainer.contains(selection.anchorNode)) {
       removeButton();
@@ -683,40 +789,69 @@ function setupTextSelectionFactCheck() {
     if (!btn) {
       btn = document.createElement("button");
       btn.id = "factcheck-selection-btn";
-      btn.textContent = "Fact Check";
+      // Logo-only bubble: extension icon + tooltip
+      btn.innerHTML = `
+        <img src="${chrome.runtime.getURL('icons/icon32.png')}" width="22" height="22" alt="FactCheck AI" style="display:block;pointer-events:none;">
+        <span style="
+          position:absolute;
+          bottom:calc(100% + 6px);
+          left:50%;
+          transform:translateX(-50%);
+          background:#151c27;
+          color:#fff;
+          font-family:Inter,sans-serif;
+          font-size:11px;
+          font-weight:500;
+          white-space:nowrap;
+          padding:3px 8px;
+          border-radius:6px;
+          opacity:0;
+          pointer-events:none;
+          transition:opacity 0.15s;
+        " class="fc-tooltip">Fact-check this</span>
+      `;
       btn.style.cssText = `
         position: absolute;
         z-index: 2147483647;
-        background: #000000;
-        color: #ffffff;
-        border: none;
-        border-radius: 0.75rem;
-        padding: 4px 16px;
-        font-size: 13px;
-        font-weight: 500;
-        font-family: Inter, sans-serif;
+        background: #ffffff;
+        border: 1.5px solid #e2e8f8;
+        border-radius: 50%;
+        width: 38px;
+        height: 38px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
-        box-shadow: 0px 10px 25px rgba(0,0,0,0.1);
-        letter-spacing: 0.02em;
+        box-shadow: 0 4px 16px rgba(21,28,39,0.15);
+        transition: transform 0.15s, box-shadow 0.15s;
       `;
+      btn.addEventListener('mouseover', () => {
+        btn.style.transform = 'scale(1.1)';
+        btn.style.boxShadow = '0 6px 20px rgba(21,28,39,0.2)';
+        const tip = btn.querySelector('.fc-tooltip');
+        if (tip) tip.style.opacity = '1';
+      });
+      btn.addEventListener('mouseout', () => {
+        btn.style.transform = '';
+        btn.style.boxShadow = '0 4px 16px rgba(21,28,39,0.15)';
+        const tip = btn.querySelector('.fc-tooltip');
+        if (tip) tip.style.opacity = '0';
+      });
       btn.addEventListener('mousedown', (e) => {
-        e.preventDefault(); // Prevent text deselection
+        e.preventDefault();
         e.stopPropagation();
       });
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const currentText = window.getSelection().toString().trim();
-        if (currentText.length >= 10 && currentText.length <= 500) {
-          sendManualClaim(currentText);
+        if (currentSelectedText.length >= 10 && currentSelectedText.length <= 500) {
+          sendManualClaim(currentSelectedText);
           
-          // Show sidebar automatically if hidden
+          // Show sidebar overlay locally on the page (without saving to storage!)
           if (shadow && sidebarContainer) {
             sidebarContainer.style.display = "block";
-            const sidebar = shadow.getElementById("factcheck-sidebar");
-            if (sidebar) sidebar.style.display = "flex";
             toggleOverlayVisibility(true);
-            chrome.storage.local.set({ showOverlay: true });
           }
           
           removeButton();
@@ -728,13 +863,13 @@ function setupTextSelectionFactCheck() {
       }
     }
 
-    // Wait a tick for bounding rect to be accurate
+    // Position bubble just above the selection end-point
     setTimeout(() => {
       const currentSelection = window.getSelection();
       if (currentSelection && currentSelection.rangeCount > 0 && btn) {
         const rect = currentSelection.getRangeAt(0).getBoundingClientRect();
-        btn.style.top  = \`\${rect.top + window.scrollY - 40}px\`;
-        btn.style.left = \`\${rect.left + window.scrollX + rect.width / 2 - 50}px\`;
+        btn.style.top  = `${rect.top + window.scrollY - 48}px`;
+        btn.style.left = `${rect.left + window.scrollX + rect.width / 2 - 19}px`;
       }
     }, 0);
   });
@@ -762,11 +897,9 @@ function setupTextSelectionFactCheck() {
         
         // Show sidebar automatically if hidden
         if (shadow && sidebarContainer) {
-          sidebarContainer.style.display = "block";
-          const sidebar = shadow.getElementById("factcheck-sidebar");
-          if (sidebar) sidebar.style.display = "flex";
+          const enableOverlayCheckbox = shadow.getElementById("enable-overlay-overlay");
+          if (enableOverlayCheckbox) enableOverlayCheckbox.checked = true;
           toggleOverlayVisibility(true);
-          chrome.storage.local.set({ showOverlay: true });
         }
         
         removeButton();
