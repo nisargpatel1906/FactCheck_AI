@@ -10,7 +10,7 @@ async def transcribe_audio(audio_base64: str) -> str:
     Decodes a base64 audio chunk and transcribes it using Groq's Whisper API.
     """
     if not config.GROQ_API_KEY:
-        logger.error("GROQ_API_KEY is not configured.")
+        logger.warning("GROQ_API_KEY is not set — audio transcription disabled. Using captions only.")
         return ""
 
     try:
