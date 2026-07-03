@@ -769,113 +769,109 @@ function setupTextSelectionFactCheck() {
     }
   }
 
-  document.addEventListener('mouseup', (e) => {
-    // If clicking on the button itself, don't do anything here (handled by btn click listener)
-    if (btn && btn.contains(e.target)) return;
+  document.addEventListener('selectionchange', () => {
+    const selection = window.getSelection();
+    if (!selection) return;
+    const text = selection.toString().trim();
+    if (text.length < 5 || text.length > 1000) {
+      removeButton();
+      return;
+    }
+    
+    currentSelectedText = text;
 
-    setTimeout(() => {
-      const selection = window.getSelection();
-      if (!selection) return;
-      const text = selection.toString().trim();
-      
-      // Check if valid selection
-      if (text.length < 5 || text.length > 1000) {
-        // We do not remove the button here if they just released the mouse after clicking a completely different place; 
-        // the mousedown handler handles removal.
-        return;
-      }
-      
-      currentSelectedText = text;
+    // Check if selection is inside our sidebar
+    if (sidebarContainer && sidebarContainer.contains(selection.anchorNode)) {
+      removeButton();
+      return;
+    }
 
-      // Check if selection is inside our sidebar
-      if (sidebarContainer && sidebarContainer.contains(selection.anchorNode)) {
-        return;
-      }
-
-      if (!btn) {
-        btn = document.createElement("button");
-        btn.id = "factcheck-selection-btn";
-        // Logo-only bubble: extension icon + tooltip
-        btn.innerHTML = `
-          <img src="${chrome.runtime.getURL('icons/icon32.png')}" width="22" height="22" alt="FactCheck AI" style="display:block;pointer-events:none;">
-          <span style="
-            position:absolute;
-            bottom:calc(100% + 6px);
-            left:50%;
-            transform:translateX(-50%);
-            background:#151c27;
-            color:#fff;
-            font-family:Inter,sans-serif;
-            font-size:11px;
-            font-weight:500;
-            white-space:nowrap;
-            padding:3px 8px;
-            border-radius:6px;
-            opacity:0;
-            pointer-events:none;
-            transition:opacity 0.15s;
-          " class="fc-tooltip">Fact-check this</span>
-        `;
-        btn.style.cssText = `
-          position: absolute;
-          z-index: 2147483647;
-          background: #ffffff;
-          border: 1.5px solid #e2e8f8;
-          border-radius: 50%;
-          width: 38px;
-          height: 38px;
-          padding: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          box-shadow: 0 4px 16px rgba(21,28,39,0.15);
-          transition: transform 0.15s, box-shadow 0.15s;
-        `;
-        btn.addEventListener('mouseover', () => {
-          btn.style.transform = 'scale(1.1)';
-          btn.style.boxShadow = '0 6px 20px rgba(21,28,39,0.2)';
-          const tip = btn.querySelector('.fc-tooltip');
-          if (tip) tip.style.opacity = '1';
-        });
-        btn.addEventListener('mouseout', () => {
-          btn.style.transform = '';
-          btn.style.boxShadow = '0 4px 16px rgba(21,28,39,0.15)';
-          const tip = btn.querySelector('.fc-tooltip');
-          if (tip) tip.style.opacity = '0';
-        });
-        btn.addEventListener('mousedown', (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-        });
-        btn.addEventListener('click', (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          if (currentSelectedText.length >= 5 && currentSelectedText.length <= 1000) {
-            sendManualClaim(currentSelectedText);
-            
-            // Show sidebar overlay locally on the page
-            if (shadow && sidebarContainer) {
-              sidebarContainer.style.display = "block";
-              toggleOverlayVisibility(true);
-            }
-            
-            removeButton();
-            window.getSelection().removeAllRanges();
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "factcheck-selection-btn";
+      // Logo-only bubble: extension icon + tooltip
+      btn.innerHTML = `
+        <img src="${chrome.runtime.getURL('icons/icon32.png')}" width="22" height="22" alt="FactCheck AI" style="display:block;pointer-events:none;">
+        <span style="
+          position:absolute;
+          bottom:calc(100% + 6px);
+          left:50%;
+          transform:translateX(-50%);
+          background:#151c27;
+          color:#fff;
+          font-family:Inter,sans-serif;
+          font-size:11px;
+          font-weight:500;
+          white-space:nowrap;
+          padding:3px 8px;
+          border-radius:6px;
+          opacity:0;
+          pointer-events:none;
+          transition:opacity 0.15s;
+        " class="fc-tooltip">Fact-check this</span>
+      `;
+      btn.style.cssText = `
+        position: absolute;
+        z-index: 2147483647;
+        background: #ffffff;
+        border: 1.5px solid #e2e8f8;
+        border-radius: 50%;
+        width: 38px;
+        height: 38px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 4px 16px rgba(21,28,39,0.15);
+        transition: transform 0.15s, box-shadow 0.15s;
+      `;
+      btn.addEventListener('mouseover', () => {
+        btn.style.transform = 'scale(1.1)';
+        btn.style.boxShadow = '0 6px 20px rgba(21,28,39,0.2)';
+        const tip = btn.querySelector('.fc-tooltip');
+        if (tip) tip.style.opacity = '1';
+      });
+      btn.addEventListener('mouseout', () => {
+        btn.style.transform = '';
+        btn.style.boxShadow = '0 4px 16px rgba(21,28,39,0.15)';
+        const tip = btn.querySelector('.fc-tooltip');
+        if (tip) tip.style.opacity = '0';
+      });
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (currentSelectedText.length >= 5 && currentSelectedText.length <= 1000) {
+          sendManualClaim(currentSelectedText);
+          
+          // Show sidebar overlay locally on the page (without saving to storage!)
+          if (shadow && sidebarContainer) {
+            sidebarContainer.style.display = "block";
+            toggleOverlayVisibility(true);
           }
-        });
-        if (document.body) {
-          document.body.appendChild(btn);
+          
+          removeButton();
+          window.getSelection().removeAllRanges();
         }
+      });
+      if (document.body) {
+        document.body.appendChild(btn);
       }
+    }
 
-      // Position bubble just above the selection end-point
-      if (selection.rangeCount > 0 && btn) {
-        const rect = selection.getRangeAt(0).getBoundingClientRect();
-        btn.style.top  = \`\${rect.top + window.scrollY - 48}px\`;
-        btn.style.left = \`\${rect.left + window.scrollX + rect.width / 2 - 19}px\`;
+    // Position bubble just above the selection end-point
+    setTimeout(() => {
+      const currentSelection = window.getSelection();
+      if (currentSelection && currentSelection.rangeCount > 0 && btn) {
+        const rect = currentSelection.getRangeAt(0).getBoundingClientRect();
+        btn.style.top  = `${rect.top + window.scrollY - 48}px`;
+        btn.style.left = `${rect.left + window.scrollX + rect.width / 2 - 19}px`;
       }
-    }, 10);
+    }, 0);
   });
 
   document.addEventListener('mousedown', (e) => {
