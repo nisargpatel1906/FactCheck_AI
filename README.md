@@ -5,10 +5,12 @@
 
 **Real-time, multi-agent fact-checking for the videos you're already watching.**
 
-[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/)
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Manifest%20V3-yellow)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 [![Status: In Development](https://img.shields.io/badge/Status-In%20Development-orange)]()
+
+<img src="demo.gif" alt="FactCheck AI Demo" width="100%" style="max-width: 850px; margin-top: 20px; border-radius: 8px;">
 
 </div>
 
@@ -215,7 +217,7 @@ Please keep pull requests focused on a single change where possible, and follow 
 
 ## License
 
-This project is proprietary. It is licensed under a custom **Personal & Non-Commercial License**. See [LICENSE](LICENSE) for the full text.
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for the full text.
 
 ## Developers
 
