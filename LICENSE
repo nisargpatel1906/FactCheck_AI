@@ -1,23 +1,21 @@
-FactCheck AI License Agreement
+MIT License
 
-Copyright (c) 2026 Nisarg Patel. All rights reserved.
+Copyright (c) 2026 Nisarg Patel
 
-This Software is proprietary and is licensed, not sold. By downloading, installing, copying, or using the Software, you agree to be bound by the terms of this License Agreement.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-1. Grant of License
-Subject to your compliance with the terms and conditions of this Agreement, the Copyright Holder grants you a limited, non-exclusive, non-transferable, revocable license to:
-* Download, install, and run the Software solely on your personal devices.
-* Use the Software strictly for your own personal, non-commercial purposes.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-2. Restrictions
-You explicitly agree NOT to, and will not permit others to:
-* No Modification: Modify, alter, adapt, translate, decompile, disassemble, reverse engineer, or create derivative works of the Software or any part of the source code without prior written permission from the Copyright Holder.
-* No Distribution: Copy, distribute, publish, rent, lease, sublicense, or otherwise transfer the Software or any portion of its code to any third party.
-* No Commercial Use: Use the Software, its backend API, or any related scripts for any commercial, business, or institutional purposes (including but not limited to internal business use, training commercial AI models, or hosting it as a service/SaaS for others) without prior written permission and obtaining a commercial license from the Copyright Holder.
-* No Selling: Sell, resell, monetize, or charge any fee for access to the Software, modified versions of the Software, or services powered by the Software.
-
-3. Commercial Use and Modifications
-Any commercial use, integration into business workflows, distribution, or modification of this Software requires a separate written commercial agreement. For licensing inquiries, modification requests, or commercial permissions, please contact Nisarg Patel (Copyright Holder).
-
-4. Disclaimer of Warranty
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
