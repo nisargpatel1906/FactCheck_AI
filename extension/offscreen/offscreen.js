@@ -3,20 +3,13 @@ console.log("[Offscreen] Offscreen script initialized.");
 // Signal to background worker that the offscreen document is loaded and ready
 chrome.runtime.sendMessage({ type: "offscreen-ready" }).catch(() => {});
 
-let audioContext = null;
 let mediaStream = null;
 let outputAudio = null;
-let recorderNode = null;  // AudioWorkletNode replacing ScriptProcessorNode
+let activeRecorder = null;
+let recordIntervalId = null;
 
-// VAD parameters
-const SAMPLE_RATE = 16000;
-const MAX_CHUNK_DURATION_MS = 15000; // 15 seconds — fast first transcription
-const SPEECH_RMS_THRESHOLD = 0.01;  // discard silent frames
+const MAX_CHUNK_DURATION_MS = 15000; // 15 seconds chunking
 
-let audioBuffer = [];
-let speechStartTimestamp = null;
-let lastProgressMs = 0;
-let chunkHasSpeech = false;
 let isPaused = false;
 
 // Listen for messages from background service worker
@@ -24,7 +17,7 @@ chrome.runtime.onMessage.addListener(async (message) => {
   console.log("[Offscreen] Received message:", message.type);
   if (message.type === "start-capture") {
     try {
-      if (audioContext) await stopCapture();
+      await stopCapture();
       await startCapture(message.streamId);
     } catch (error) {
       console.error("[Offscreen] Failed to start capture:", error);
@@ -42,20 +35,6 @@ chrome.runtime.onMessage.addListener(async (message) => {
   }
 });
 
-// Inline AudioWorklet processor registered at runtime (no separate file needed)
-const WORKLET_CODE = `
-class ChunkProcessor extends AudioWorkletProcessor {
-  process(inputs) {
-    const ch = inputs[0][0];
-    if (ch && ch.length > 0) {
-      this.port.postMessage(ch);
-    }
-    return true;
-  }
-}
-registerProcessor('chunk-processor', ChunkProcessor);
-`;
-
 async function startCapture(streamId) {
   console.log("[Offscreen] Starting tab audio capture, streamId:", streamId);
 
@@ -71,66 +50,69 @@ async function startCapture(streamId) {
   outputAudio.srcObject = mediaStream;
   outputAudio.play();
 
-  audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+  startRecordingCycle();
+  console.log("[Offscreen] Audio capture started (MediaRecorder, 15s chunks).");
+}
 
-  // Register inline worklet (blob URL avoids needing a separate .js file)
-  const blob = new Blob([WORKLET_CODE], { type: "application/javascript" });
-  const blobUrl = URL.createObjectURL(blob);
-  await audioContext.audioWorklet.addModule(blobUrl);
-  URL.revokeObjectURL(blobUrl);
-
-  const source = audioContext.createMediaStreamSource(mediaStream);
-  recorderNode = new AudioWorkletNode(audioContext, "chunk-processor");
-
-  recorderNode.port.onmessage = (event) => {
-    if (isPaused) return;
-    const inputData = event.data; // Float32Array
-
-    if (audioBuffer.length === 0) {
-      speechStartTimestamp = Date.now();
-    }
-
-    // Append samples
-    for (let i = 0; i < inputData.length; i++) {
-      audioBuffer.push(inputData[i]);
-    }
-
-    // VAD: check RMS for speech
-    if (!chunkHasSpeech) {
-      let sumSq = 0;
-      for (let i = 0; i < inputData.length; i++) sumSq += inputData[i] * inputData[i];
-      if (Math.sqrt(sumSq / inputData.length) >= SPEECH_RMS_THRESHOLD) {
-        chunkHasSpeech = true;
-      }
-    }
-
-    // Progress & chunk flush
-    const durationMs = (audioBuffer.length / SAMPLE_RATE) * 1000;
-
-    if (durationMs - lastProgressMs >= 1000) {
-      lastProgressMs = durationMs;
+function startRecordingCycle() {
+  if (!mediaStream) return;
+  
+  activeRecorder = new MediaRecorder(mediaStream, { mimeType: "audio/webm;codecs=opus" });
+  
+  activeRecorder.ondataavailable = async (event) => {
+    if (isPaused) return; // ignore chunk if paused
+    if (event.data.size > 0) {
+      console.log(`[Offscreen] Chunk captured. Size: ${event.data.size} bytes`);
+      const buffer = await event.data.arrayBuffer();
+      const base64Audio = arrayBufferToBase64(buffer);
+      
       chrome.runtime.sendMessage({
-        type: "audio_progress",
-        durationMs,
-        maxMs: MAX_CHUNK_DURATION_MS
-      }).catch(() => {});
-    }
-
-    if (durationMs >= MAX_CHUNK_DURATION_MS) {
-      console.log("[Offscreen] Chunk limit reached. Flushing.");
-      flushBuffer();
+        type: "audio_chunk",
+        audio_base64: base64Audio,
+        format: "webm",
+        timestamp_ms: Date.now()
+      }).catch(err => console.error("[Offscreen] Failed to send audio chunk:", err));
     }
   };
 
-  source.connect(recorderNode);
-  // Don't connect recorderNode to destination — we don't want double audio
-  // (outputAudio already handles playback)
+  activeRecorder.start();
+  
+  // Send progress every second
+  let elapsed = 0;
+  recordIntervalId = setInterval(() => {
+    if (isPaused) return;
+    elapsed += 1000;
+    chrome.runtime.sendMessage({
+      type: "audio_progress",
+      durationMs: elapsed,
+      maxMs: MAX_CHUNK_DURATION_MS
+    }).catch(() => {});
+    
+    if (elapsed >= MAX_CHUNK_DURATION_MS) {
+      // Time to cycle the recorder
+      cycleRecorder();
+    }
+  }, 1000);
+}
 
-  console.log("[Offscreen] Audio capture started (AudioWorklet, 15s chunks).");
+function cycleRecorder() {
+  if (recordIntervalId) {
+    clearInterval(recordIntervalId);
+    recordIntervalId = null;
+  }
+  if (activeRecorder && activeRecorder.state === "recording") {
+    activeRecorder.stop(); // This triggers ondataavailable
+  }
+  startRecordingCycle();
 }
 
 async function stopCapture() {
   console.log("[Offscreen] Stopping capture...");
+
+  if (recordIntervalId) {
+    clearInterval(recordIntervalId);
+    recordIntervalId = null;
+  }
 
   if (outputAudio) {
     outputAudio.pause();
@@ -138,10 +120,9 @@ async function stopCapture() {
     outputAudio = null;
   }
 
-  if (recorderNode) {
-    recorderNode.port.onmessage = null;
-    recorderNode.disconnect();
-    recorderNode = null;
+  if (activeRecorder && activeRecorder.state === "recording") {
+    activeRecorder.stop();
+    activeRecorder = null;
   }
 
   if (mediaStream) {
@@ -149,75 +130,8 @@ async function stopCapture() {
     mediaStream = null;
   }
 
-  if (audioContext) {
-    if (audioContext.state !== "closed") await audioContext.close();
-    audioContext = null;
-  }
-
-  flushBuffer();
-  lastProgressMs = 0;
   chrome.runtime.sendMessage({ type: "audio_progress", durationMs: 0, maxMs: MAX_CHUNK_DURATION_MS }).catch(() => {});
   console.log("[Offscreen] Audio capture stopped.");
-}
-
-function flushBuffer() {
-  if (audioBuffer.length === 0) return;
-
-  const hadSpeech = chunkHasSpeech;
-  const chunkBuffer = [...audioBuffer];
-  audioBuffer = [];
-  lastProgressMs = 0;
-  chunkHasSpeech = false;
-
-  if (!hadSpeech) {
-    console.log("[Offscreen] Chunk discarded: silent.");
-    return;
-  }
-
-  const wavBytes = bufferToWav(chunkBuffer, SAMPLE_RATE);
-  const base64Audio = arrayBufferToBase64(wavBytes);
-
-  chrome.runtime.sendMessage({
-    type: "audio_chunk",
-    audio_base64: base64Audio,
-    format: "wav",
-    timestamp_ms: speechStartTimestamp || Date.now()
-  }).catch(err => console.error("[Offscreen] Failed to send audio chunk:", err));
-}
-
-function bufferToWav(buffer, sampleRate) {
-  const l = buffer.length;
-  const bufferLength = l * 2;
-  const arrayBuffer = new ArrayBuffer(44 + bufferLength);
-  const view = new DataView(arrayBuffer);
-
-  writeString(view, 0, "RIFF");
-  view.setUint32(4, 36 + bufferLength, true);
-  writeString(view, 8, "WAVE");
-  writeString(view, 12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeString(view, 36, "data");
-  view.setUint32(40, bufferLength, true);
-
-  let offset = 44;
-  for (let i = 0; i < l; i++) {
-    const s = Math.max(-1, Math.min(1, buffer[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-    offset += 2;
-  }
-  return arrayBuffer;
-}
-
-function writeString(view, offset, string) {
-  for (let i = 0; i < string.length; i++) {
-    view.setUint8(offset + i, string.charCodeAt(i));
-  }
 }
 
 function arrayBufferToBase64(buffer) {

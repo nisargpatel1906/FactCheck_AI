@@ -22,7 +22,7 @@ async def transcribe_audio(audio_base64: str) -> str:
                 response = await client.post(
                     "https://api.groq.com/openai/v1/audio/translations",
                     headers={"Authorization": f"Bearer {api_keys.groq_keys.current}"},
-                    files={"file": ("audio.wav", audio_bytes, "audio/wav")},
+                    files={"file": ("audio.webm", audio_bytes, "audio/webm")},
                     data={"model": "whisper-large-v3", "response_format": "json"},
                     timeout=30.0,
                 )
