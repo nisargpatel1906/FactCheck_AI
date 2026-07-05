@@ -8,7 +8,7 @@ let outputAudio = null;
 let activeRecorder = null;
 let recordIntervalId = null;
 
-const MAX_CHUNK_DURATION_MS = 15000; // 15 seconds chunking
+const MAX_CHUNK_DURATION_MS = 60000; // 60 seconds chunking
 
 let isPaused = false;
 
