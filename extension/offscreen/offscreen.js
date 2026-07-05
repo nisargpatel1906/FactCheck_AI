@@ -5,31 +5,26 @@ chrome.runtime.sendMessage({ type: "offscreen-ready" }).catch(() => {});
 
 let audioContext = null;
 let mediaStream = null;
-let scriptProcessor = null;
 let outputAudio = null;
+let recorderNode = null;  // AudioWorkletNode replacing ScriptProcessorNode
 
 // VAD parameters
 const SAMPLE_RATE = 16000;
-const BUFFER_SIZE = 4096;
-const MAX_CHUNK_DURATION_MS = 60000; // 60 seconds (1 minute) to provide more context
-// Minimum RMS amplitude to consider a buffer frame as containing speech.
-// Whisper hallucinates on silence — discard chunks below this floor.
-const SPEECH_RMS_THRESHOLD = 0.01;
+const MAX_CHUNK_DURATION_MS = 15000; // 15 seconds — fast first transcription
+const SPEECH_RMS_THRESHOLD = 0.01;  // discard silent frames
 
 let audioBuffer = [];
 let speechStartTimestamp = null;
 let lastProgressMs = 0;
-let chunkHasSpeech = false; // true once any frame in the current chunk exceeds the RMS threshold
+let chunkHasSpeech = false;
 let isPaused = false;
 
 // Listen for messages from background service worker
 chrome.runtime.onMessage.addListener(async (message) => {
-  console.log("[Offscreen] Received message:", message);
+  console.log("[Offscreen] Received message:", message.type);
   if (message.type === "start-capture") {
     try {
-      if (audioContext) {
-        await stopCapture();
-      }
+      if (audioContext) await stopCapture();
       await startCapture(message.streamId);
     } catch (error) {
       console.error("[Offscreen] Failed to start capture:", error);
@@ -42,128 +37,131 @@ chrome.runtime.onMessage.addListener(async (message) => {
     console.log("[Offscreen] Audio capture paused.");
   } else if (message.type === "resume-capture") {
     isPaused = false;
-    if (outputAudio) outputAudio.play().catch(()=>{});
+    if (outputAudio) outputAudio.play().catch(() => {});
     console.log("[Offscreen] Audio capture resumed.");
   }
 });
 
+// Inline AudioWorklet processor registered at runtime (no separate file needed)
+const WORKLET_CODE = `
+class ChunkProcessor extends AudioWorkletProcessor {
+  process(inputs) {
+    const ch = inputs[0][0];
+    if (ch && ch.length > 0) {
+      this.port.postMessage(ch);
+    }
+    return true;
+  }
+}
+registerProcessor('chunk-processor', ChunkProcessor);
+`;
+
 async function startCapture(streamId) {
-  console.log(`[Offscreen] Starting tab audio capture for stream ID: ${streamId}`);
-  
-  // Retrieve the tab capture stream
+  console.log("[Offscreen] Starting tab audio capture, streamId:", streamId);
+
   mediaStream = await navigator.mediaDevices.getUserMedia({
     audio: {
-      mandatory: {
-        chromeMediaSource: "tab",
-        chromeMediaSourceId: streamId
-      }
+      mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId }
     },
     video: false
   });
 
-  // Play the original stream back so the user can still hear it at full quality
+  // Pass-through so the user still hears the tab
   outputAudio = new Audio();
   outputAudio.srcObject = mediaStream;
   outputAudio.play();
 
-  // Create AudioContext at 16kHz for efficient speech-to-text downsampling
-  audioContext = new (window.AudioContext || window.webkitAudioContext)({
-    sampleRate: SAMPLE_RATE
-  });
+  audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+
+  // Register inline worklet (blob URL avoids needing a separate .js file)
+  const blob = new Blob([WORKLET_CODE], { type: "application/javascript" });
+  const blobUrl = URL.createObjectURL(blob);
+  await audioContext.audioWorklet.addModule(blobUrl);
+  URL.revokeObjectURL(blobUrl);
 
   const source = audioContext.createMediaStreamSource(mediaStream);
-  
-  // ScriptProcessor node for custom volume analysis and buffer collection
-  scriptProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
-  
-  source.connect(scriptProcessor);
-  scriptProcessor.connect(audioContext.destination);
+  recorderNode = new AudioWorkletNode(audioContext, "chunk-processor");
 
-  scriptProcessor.onaudioprocess = (event) => {
+  recorderNode.port.onmessage = (event) => {
     if (isPaused) return;
-    
-    const inputData = event.inputBuffer.getChannelData(0);
-    
+    const inputData = event.data; // Float32Array
+
     if (audioBuffer.length === 0) {
       speechStartTimestamp = Date.now();
     }
 
-    // Append current samples to buffer
+    // Append samples
     for (let i = 0; i < inputData.length; i++) {
       audioBuffer.push(inputData[i]);
     }
 
-    // Check if this frame contains speech via RMS
+    // VAD: check RMS for speech
     if (!chunkHasSpeech) {
       let sumSq = 0;
       for (let i = 0; i < inputData.length; i++) sumSq += inputData[i] * inputData[i];
-      const rms = Math.sqrt(sumSq / inputData.length);
-      if (rms >= SPEECH_RMS_THRESHOLD) {
+      if (Math.sqrt(sumSq / inputData.length) >= SPEECH_RMS_THRESHOLD) {
         chunkHasSpeech = true;
       }
     }
 
-    // Check max chunk duration constraint (exactly 1 minute / 60 seconds)
+    // Progress & chunk flush
     const durationMs = (audioBuffer.length / SAMPLE_RATE) * 1000;
-    
+
     if (durationMs - lastProgressMs >= 1000) {
       lastProgressMs = durationMs;
       chrome.runtime.sendMessage({
         type: "audio_progress",
-        durationMs: durationMs,
+        durationMs,
         maxMs: MAX_CHUNK_DURATION_MS
-      }).catch(()=>{});
+      }).catch(() => {});
     }
 
     if (durationMs >= MAX_CHUNK_DURATION_MS) {
-      console.log("[Offscreen] 1-minute chunk duration reached. Flushing chunk.");
+      console.log("[Offscreen] Chunk limit reached. Flushing.");
       flushBuffer();
     }
   };
 
-  console.log("[Offscreen] Tab audio capturing started (1-minute chunking mode).");
+  source.connect(recorderNode);
+  // Don't connect recorderNode to destination — we don't want double audio
+  // (outputAudio already handles playback)
+
+  console.log("[Offscreen] Audio capture started (AudioWorklet, 15s chunks).");
 }
 
 async function stopCapture() {
-  console.log("[Offscreen] Stopping tab audio capture...");
-  
+  console.log("[Offscreen] Stopping capture...");
+
   if (outputAudio) {
     outputAudio.pause();
     outputAudio.srcObject = null;
     outputAudio = null;
   }
 
-  if (scriptProcessor) {
-    scriptProcessor.disconnect();
-    scriptProcessor = null;
+  if (recorderNode) {
+    recorderNode.port.onmessage = null;
+    recorderNode.disconnect();
+    recorderNode = null;
   }
 
   if (mediaStream) {
-    mediaStream.getTracks().forEach((track) => track.stop());
+    mediaStream.getTracks().forEach(t => t.stop());
     mediaStream = null;
   }
 
   if (audioContext) {
-    if (audioContext.state !== "closed") {
-      await audioContext.close();
-    }
+    if (audioContext.state !== "closed") await audioContext.close();
     audioContext = null;
   }
 
   flushBuffer();
   lastProgressMs = 0;
-  chrome.runtime.sendMessage({
-    type: "audio_progress",
-    durationMs: 0,
-    maxMs: MAX_CHUNK_DURATION_MS
-  }).catch(()=>{});
-  console.log("[Offscreen] Tab audio capturing stopped.");
+  chrome.runtime.sendMessage({ type: "audio_progress", durationMs: 0, maxMs: MAX_CHUNK_DURATION_MS }).catch(() => {});
+  console.log("[Offscreen] Audio capture stopped.");
 }
 
 function flushBuffer() {
-  if (audioBuffer.length === 0) {
-    return;
-  }
+  if (audioBuffer.length === 0) return;
 
   const hadSpeech = chunkHasSpeech;
   const chunkBuffer = [...audioBuffer];
@@ -172,12 +170,10 @@ function flushBuffer() {
   chunkHasSpeech = false;
 
   if (!hadSpeech) {
-    // ponytail: discard silent chunk — Whisper hallucinates on silence/background noise
-    console.log("[Offscreen] Chunk discarded: no speech detected (below RMS threshold).");
+    console.log("[Offscreen] Chunk discarded: silent.");
     return;
   }
 
-  // Convert float samples to 16-bit PCM WAV
   const wavBytes = bufferToWav(chunkBuffer, SAMPLE_RATE);
   const base64Audio = arrayBufferToBase64(wavBytes);
 
@@ -186,16 +182,12 @@ function flushBuffer() {
     audio_base64: base64Audio,
     format: "wav",
     timestamp_ms: speechStartTimestamp || Date.now()
-  }).catch((err) => {
-    console.error("[Offscreen] Failed to send audio chunk message:", err);
-  });
+  }).catch(err => console.error("[Offscreen] Failed to send audio chunk:", err));
 }
 
-// WAV encoding helper
 function bufferToWav(buffer, sampleRate) {
-  const numOfChan = 1;
   const l = buffer.length;
-  const bufferLength = l * 2; // 2 bytes per sample (16-bit PCM)
+  const bufferLength = l * 2;
   const arrayBuffer = new ArrayBuffer(44 + bufferLength);
   const view = new DataView(arrayBuffer);
 
@@ -204,12 +196,12 @@ function bufferToWav(buffer, sampleRate) {
   writeString(view, 8, "WAVE");
   writeString(view, 12, "fmt ");
   view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // Raw PCM
-  view.setUint16(22, numOfChan, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
   view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true); // Byte rate (sample rate * block align)
-  view.setUint16(32, 2, true); // Block align
-  view.setUint16(34, 16, true); // Bits per sample
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
   writeString(view, 36, "data");
   view.setUint32(40, bufferLength, true);
 
@@ -219,7 +211,6 @@ function bufferToWav(buffer, sampleRate) {
     view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
     offset += 2;
   }
-
   return arrayBuffer;
 }
 
@@ -229,13 +220,9 @@ function writeString(view, offset, string) {
   }
 }
 
-// ArrayBuffer to Base64 utility
 function arrayBufferToBase64(buffer) {
   let binary = "";
   const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
 }

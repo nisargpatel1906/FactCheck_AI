@@ -10,7 +10,7 @@ let sessionTranscript = "";
 const DEFAULT_BACKEND_URL = "https://backend-tawny-six-95.vercel.app";
 
 // Polling interval for claim detection (in milliseconds)
-const CLAIM_DETECTION_INTERVAL = 20000;
+const CLAIM_DETECTION_INTERVAL = 10000; // 10 seconds
 let detectionIntervalId = null;
 
 // Track active pipeline tasks to avoid duplicate execution
@@ -317,6 +317,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "caption_chunk") {
     sessionTranscript = (sessionTranscript + " " + message.text).trim().slice(-1000);
   } else if (message.type === "manual_claim") {
+    // Manual claims always run — remove from dedup set first so re-checks work
+    activeClaims.delete(message.text);
     getBackendUrl().then(url => executeFactCheckPipeline(message.text, url));
   } else if (message.type === "audio_chunk") {
     if (message.audio_base64) processAudioChunk(message.audio_base64);
