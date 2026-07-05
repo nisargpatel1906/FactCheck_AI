@@ -19,18 +19,10 @@ from schemas import (
     StoreVerdictRequest
 )
 
-# Set up logging configuration
-log_dir = "logs"
-os.makedirs(log_dir, exist_ok=True)
-from logging.handlers import RotatingFileHandler
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        RotatingFileHandler(os.path.join(log_dir, "server.log"), maxBytes=5*1024*1024, backupCount=3),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("backend")
 
