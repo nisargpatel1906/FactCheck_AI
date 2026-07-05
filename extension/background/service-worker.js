@@ -123,15 +123,28 @@ async function executeFactCheckPipeline(claimText, baseUrl) {
   
   console.log(`[Pipeline] Starting for: "${claimText}"`);
   
-  // 1. Cache Lookup
+  // 1. Cache Lookup & Rate Limit Check
   broadcastMessage({ type: "status_update", claim_id, claim_text: claimText, status: "checking" });
   
   try {
+    const deviceId = await getDeviceId();
     const cacheRes = await fetch(`${baseUrl}/api/cache_lookup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ claim_text: claimText })
+      body: JSON.stringify({ claim_text: claimText, device_id: deviceId })
     });
+    
+    if (cacheRes.status === 429) {
+      console.warn(`[Pipeline] Rate limit exceeded for device ${deviceId}`);
+      broadcastVerdict({
+        claim_id, claim_text: claimText,
+        verdict: "unverifiable",
+        explanation: "Daily Limit Reached (15/15). You have used all your fact-checks for today. Please try again tomorrow.",
+        sources: [], cached: false
+      });
+      return;
+    }
+
     const cacheData = await cacheRes.json();
     
     if (cacheData.cached) {
@@ -353,3 +366,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   return true;
 });
+
+// Helper for rate limiting
+async function getDeviceId() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['deviceId'], (result) => {
+      if (result.deviceId) {
+        resolve(result.deviceId);
+      } else {
+        const newId = 'device_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+        chrome.storage.local.set({ deviceId: newId }, () => resolve(newId));
+      }
+    });
+  });
+}

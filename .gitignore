@@ -31,6 +31,8 @@ promo/
 animation/
 desktop.ini
 wireframe-skill/
+factcheck_claims.csv
+export_csv.py
 
 # Logs
 logs/
