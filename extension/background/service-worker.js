@@ -7,7 +7,7 @@ let sessionClaims = [];
 let sessionTranscript = "";
 
 // Default backend HTTP URL
-const DEFAULT_BACKEND_URL = "http://localhost:8000";
+const DEFAULT_BACKEND_URL = "https://backend-tawny-six-95.vercel.app";
 
 // Polling interval for claim detection (in milliseconds)
 const CLAIM_DETECTION_INTERVAL = 20000;

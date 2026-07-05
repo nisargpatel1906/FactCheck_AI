@@ -117,7 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const backendUrlInput = document.getElementById("backend-url");
     if (backendUrlInput) {
-      backendUrlInput.value = result.backendUrl || "ws://localhost:8000/ws";
+      backendUrlInput.value = result.backendUrl || "https://backend-tawny-six-95.vercel.app";
     }
   });
 
@@ -132,7 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (saveBackendUrlBtn) {
     saveBackendUrlBtn.addEventListener("click", () => {
       const input = document.getElementById("backend-url");
-      const url = (input ? input.value : "").trim() || "ws://localhost:8000/ws";
+      const url = (input ? input.value : "").trim() || "https://backend-tawny-six-95.vercel.app";
       chrome.storage.local.set({ backendUrl: url }, () => {
         chrome.runtime.sendMessage({ type: "reconnect-backend" });
         saveBackendUrlBtn.innerText = "Saved!";
