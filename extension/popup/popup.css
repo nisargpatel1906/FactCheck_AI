@@ -594,3 +594,66 @@ html, body {
   height: 16px;
   cursor: pointer;
 }
+
+/* ---------- Header Connection Status Pill ---------- */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-family-base);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.status-pill.status-connected {
+  background: var(--color-success-container);
+  color: var(--color-on-success-container);
+  border-color: rgba(30, 142, 90, 0.25);
+}
+
+.status-pill.status-disconnected {
+  background: var(--color-error-container);
+  color: var(--color-on-error-container);
+  border-color: rgba(186, 26, 26, 0.25);
+}
+
+/* ---------- Backend Not Running Warning Banner ---------- */
+.backend-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  background: var(--color-warning-container);
+  color: var(--color-on-warning-container);
+  border: 1px solid rgba(161, 98, 7, 0.3);
+  border-radius: var(--radius-default);
+  padding: var(--space-sm) var(--space-md);
+  font-size: 12px;
+  font-family: var(--font-family-base);
+  line-height: 1.5;
+  margin-bottom: var(--space-sm);
+}
+
+.backend-warning svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.backend-warning code {
+  font-family: monospace;
+  font-size: 11px;
+  background: rgba(161, 98, 7, 0.15);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.backend-warning a {
+  color: var(--color-on-warning-container);
+  font-weight: 600;
+  text-underline-offset: 2px;
+}

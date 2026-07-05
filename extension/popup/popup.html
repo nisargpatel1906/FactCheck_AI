@@ -28,6 +28,7 @@
       <header class="sidebar-header">
         <span class="brand-title">FactCheck AI</span>
         <div class="header-actions">
+          <span class="status-pill status-disconnected" id="connection-status" title="Backend connection status">Disconnected</span>
           <button class="header-action-btn" id="menu-btn" title="Menu">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
@@ -39,6 +40,11 @@
 
       <main class="content-body">
         <div id="feed-panel" class="panel">
+          <!-- Backend not running warning -->
+          <div class="backend-warning hidden" id="backend-warning">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>Backend not running. Start <code>start.bat</code> then reload. <a href="#" id="open-settings-link">Change URL</a></span>
+          </div>
           <div class="live-monitor-header">
             <span class="monitor-title">Live Monitor - Scanning</span>
             <span class="active-pill"><span class="active-pill__dot"></span>Active</span>
@@ -76,6 +82,14 @@
             <div class="setting-item">
               <label for="enable-overlay">Show FactCheck Overlay</label>
               <input type="checkbox" id="enable-overlay" checked>
+            </div>
+            <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+              <label for="backend-url" style="font-weight: 600;">Backend WebSocket URL</label>
+              <div style="display: flex; gap: 6px; width: 100%;">
+                <input type="text" id="backend-url" placeholder="ws://localhost:8000/ws" style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--color-outline, #444); background: var(--color-surface-variant, #2a2a2a); color: inherit; font-size: 12px; font-family: monospace;">
+                <button id="save-backend-url" style="padding: 6px 10px; border-radius: 6px; border: none; background: var(--color-primary, #6366f1); color: #fff; font-size: 12px; cursor: pointer; white-space: nowrap;">Save &amp; Reconnect</button>
+              </div>
+              <div style="font-size: 11px; color: var(--color-on-surface-variant); line-height: 1.3;">Default: <code>ws://localhost:8000/ws</code>. Change this if your backend runs on a different port or host.</div>
             </div>
           </div>
         </div>

@@ -32,3 +32,44 @@ class JudgeVerdict(BaseModel):
         default_factory=list,
         description="A consolidated list of the most authoritative sources supporting the verdict."
     )
+
+# --- REST API Request & Response Models ---
+
+class STTRequest(BaseModel):
+    audio_base64: str
+
+class STTResponse(BaseModel):
+    text: str
+
+class DetectClaimsRequest(BaseModel):
+    transcript_window: str
+
+class DetectClaimsResponse(BaseModel):
+    claims: list[str]
+
+class ResearchRequest(BaseModel):
+    claim_text: str
+    angle: Literal['general_news', 'official_data', 'fact_check_sites']
+
+class DebateRequest(BaseModel):
+    claim_text: str
+    angle: Literal['general_news', 'official_data', 'fact_check_sites']
+    self_draft: ResearchDraft
+    other_drafts: dict[str, ResearchDraft] # mapping of angle -> draft
+
+class JudgeRequest(BaseModel):
+    claim_text: str
+    revised_drafts: dict[str, ResearchDraft]
+
+class CacheLookupRequest(BaseModel):
+    claim_text: str
+
+class CacheLookupResponse(BaseModel):
+    cached: bool
+    verdict: str | None = None
+    explanation: str | None = None
+    sources: list[Source] | None = None
+
+class StoreVerdictRequest(BaseModel):
+    claim_text: str
+    verdict_data: JudgeVerdict

@@ -8,136 +8,170 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 import config
+import api_keys
 from schemas import ResearchDraft, Source
 
 logger = logging.getLogger("backend.research_agent")
+
 
 @dataclass
 class AgentDeps:
     instructions: str
 
-# 1. Set up search tool helper
+
+# ── Web search (Tavily with rotation → DuckDuckGo fallback) ──────────────────
+
 async def search_web(query: str) -> str:
     """
-    Asynchronously queries Tavily API if active, or falls back to DuckDuckGo search.
+    Searches Tavily (rotating through all TAVILY keys on failure),
+    then falls back to DuckDuckGo if all Tavily keys are exhausted.
     """
-    if config.TAVILY_API_KEY:
-        try:
-            logger.info(f"Searching Tavily for: '{query}'")
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.tavily.com/search",
-                    json={
-                        "api_key": config.TAVILY_API_KEY,
-                        "query": query,
-                        "max_results": 3,
-                        "search_depth": "basic"
-                    },
-                    timeout=8.0
+    if api_keys.tavily_keys:
+        for _ in range(len(api_keys.tavily_keys)):
+            try:
+                logger.info(f"Searching Tavily (key #{api_keys.tavily_keys.active_index}): '{query}'")
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        "https://api.tavily.com/search",
+                        json={
+                            "api_key": api_keys.tavily_keys.current,
+                            "query": query,
+                            "max_results": 3,
+                            "search_depth": "basic",
+                        },
+                        timeout=8.0,
+                    )
+                if response.status_code == 200:
+                    results = response.json().get("results", [])
+                    return "\n".join(
+                        f"Title: {r.get('title')}\nURL: {r.get('url')}\nContent: {r.get('content')}\n"
+                        for r in results
+                    )
+                logger.error(
+                    f"Tavily error {response.status_code} "
+                    f"(key #{api_keys.tavily_keys.active_index}): {response.text[:200]}"
                 )
-            if response.status_code == 200:
-                results = response.json().get("results", [])
-                formatted = []
-                for r in results:
-                    formatted.append(f"Title: {r.get('title')}\nURL: {r.get('url')}\nContent: {r.get('content')}\n")
-                return "\n".join(formatted)
-        except Exception as e:
-            logger.error(f"Tavily search failed: {e}. Falling back to DuckDuckGo.")
+            except Exception as e:
+                logger.error(
+                    f"Tavily exception (key #{api_keys.tavily_keys.active_index}): {e}"
+                )
 
-    # Fallback to DuckDuckGo Search
+            if not api_keys.tavily_keys.rotate():
+                logger.warning("All Tavily keys exhausted — falling back to DuckDuckGo.")
+                break
+
+    # DuckDuckGo fallback
     try:
-        logger.info(f"Searching DuckDuckGo for: '{query}'")
-        def ddg_sync():
+        logger.info(f"Searching DuckDuckGo: '{query}'")
+        def _ddg_sync():
             try:
                 with DDGS(timeout=10) as ddgs:
                     return list(ddgs.text(query, max_results=3))
             except TypeError:
                 with DDGS() as ddgs:
                     return list(ddgs.text(query, max_results=3))
-        results = await asyncio.wait_for(asyncio.to_thread(ddg_sync), timeout=12.0)
-        formatted = []
-        for r in results:
-            formatted.append(f"Title: {r.get('title')}\nURL: {r.get('href')}\nContent: {r.get('body')}\n")
-        return "\n".join(formatted)
+
+        results = await asyncio.wait_for(asyncio.to_thread(_ddg_sync), timeout=12.0)
+        return "\n".join(
+            f"Title: {r.get('title')}\nURL: {r.get('href')}\nContent: {r.get('body')}\n"
+            for r in results
+        )
     except asyncio.TimeoutError:
-        logger.error(f"DuckDuckGo search timed out after 12 seconds.")
+        logger.error("DuckDuckGo search timed out after 12 seconds.")
         return "Search timed out."
     except Exception as e:
         logger.error(f"DuckDuckGo search failed: {e}")
         return "No search results found."
 
-# 2. Set up Pydantic AI agent
-try:
-    openai_client = AsyncOpenAI(
-        base_url=config.NVIDIA_BASE_URL,
-        api_key=config.NVIDIA_API_KEY,
-        timeout=20.0
-    )
-    provider = OpenAIProvider(openai_client=openai_client)
-    model = OpenAIChatModel(config.MODEL_RESEARCH, provider=provider)
 
-    research_agent = Agent(
-        model,
-        retries=3,
-        deps_type=AgentDeps,
-        output_type=ResearchDraft,
-        system_prompt=(
-            "You are a specialized fact-checking research agent. Your job is to investigate a factual claim by "
-            "searching the web for relevant evidence, evaluating source quality, and producing a structured research draft.\n\n"
-            "INVESTIGATION PROCESS:\n"
-            "1. Read the claim carefully. Identify the core assertion, any named entities, dates, numbers, and geographical context.\n"
-            "2. Construct 2-3 targeted search queries. Include the specific entity names, dates, and keywords from the claim. "
-            "Try at least one query that searches for counter-evidence or alternative perspectives.\n"
-            "3. Evaluate each search result critically. Distinguish between primary sources (official data, court records, "
-            "government reports) and secondary sources (news articles, opinion pieces, social media).\n\n"
-            "SOURCE QUALITY HIERARCHY (most to least authoritative):\n"
-            "- Official government data, statistical agencies, court records, parliamentary transcripts\n"
-            "- Wire services and major international news agencies (Reuters, AP, AFP)\n"
-            "- Established national newspapers of record\n"
-            "- Dedicated fact-checking organizations (Snopes, PolitiFact, FactCheck.org, AltNews)\n"
-            "- Regional news outlets and trade publications\n"
-            "- Blogs, social media, and unverified sources (lowest weight — note unreliability if used)\n\n"
-            "OUTPUT RULES:\n"
-            "1. Choose a clear stance: 'supported', 'contradicted', 'mixed', or 'missing_evidence'.\n"
-            "2. Confidence score (0.0-1.0) must reflect evidence quality:\n"
-            "   - 0.9-1.0: Multiple authoritative primary sources agree.\n"
-            "   - 0.7-0.89: Strong secondary sources agree, or one primary source confirms.\n"
-            "   - 0.5-0.69: Mixed or conflicting evidence, or only secondary sources.\n"
-            "   - Below 0.5: Weak, indirect, or insufficient evidence.\n"
-            "3. Evidence summary: bullet points with specific facts, quotes, and data points. Cite which source each fact came from.\n"
-            "4. Sources list: include title, URL, and domain for every source actually retrieved from your search. "
-            "NEVER fabricate or guess URLs — only include URLs that appeared in your search results.\n"
-            "5. If no relevant results are found after multiple searches, set stance to 'missing_evidence' with confidence below 0.3. "
-            "Do not speculate.\n"
-            "6. When investigating claims from regional contexts (e.g., India, Brazil), prioritize local-language and "
-            "region-specific sources, official government data from that country, and regional fact-checkers."
+# ── Agent factory ─────────────────────────────────────────────────────────────
+
+_SYSTEM_PROMPT = (
+    "You are a specialized fact-checking research agent. Your job is to investigate a factual claim by "
+    "searching the web for relevant evidence, evaluating source quality, and producing a structured research draft.\n\n"
+    "INVESTIGATION PROCESS:\n"
+    "1. Read the claim carefully. Identify the core assertion, any named entities, dates, numbers, and geographical context.\n"
+    "2. Construct 2-3 targeted search queries. Include the specific entity names, dates, and keywords from the claim. "
+    "Try at least one query that searches for counter-evidence or alternative perspectives.\n"
+    "3. Evaluate each search result critically. Distinguish between primary sources (official data, court records, "
+    "government reports) and secondary sources (news articles, opinion pieces, social media).\n\n"
+    "SOURCE QUALITY HIERARCHY (most to least authoritative):\n"
+    "- Official government data, statistical agencies, court records, parliamentary transcripts\n"
+    "- Wire services and major international news agencies (Reuters, AP, AFP)\n"
+    "- Established national newspapers of record\n"
+    "- Dedicated fact-checking organizations (Snopes, PolitiFact, FactCheck.org, AltNews)\n"
+    "- Regional news outlets and trade publications\n"
+    "- Blogs, social media, and unverified sources (lowest weight — note unreliability if used)\n\n"
+    "OUTPUT RULES:\n"
+    "1. Choose a clear stance: 'supported', 'contradicted', 'mixed', or 'missing_evidence'.\n"
+    "2. Confidence score (0.0-1.0) must reflect evidence quality:\n"
+    "   - 0.9-1.0: Multiple authoritative primary sources agree.\n"
+    "   - 0.7-0.89: Strong secondary sources agree, or one primary source confirms.\n"
+    "   - 0.5-0.69: Mixed or conflicting evidence, or only secondary sources.\n"
+    "   - Below 0.5: Weak, indirect, or insufficient evidence.\n"
+    "3. Evidence summary: bullet points with specific facts, quotes, and data points. Cite which source each fact came from.\n"
+    "4. Sources list: include title, URL, and domain for every source actually retrieved from your search. "
+    "NEVER fabricate or guess URLs — only include URLs that appeared in your search results.\n"
+    "5. If no relevant results are found after multiple searches, set stance to 'missing_evidence' with confidence below 0.3. "
+    "Do not speculate.\n"
+    "6. When investigating claims from regional contexts (e.g., India, Brazil), prioritize local-language and "
+    "region-specific sources, official government data from that country, and regional fact-checkers."
+)
+
+
+def _make_research_agent(api_key: str) -> Agent | None:
+    """Build a fresh research agent using the given NVIDIA API key."""
+    if not api_key:
+        return None
+    try:
+        client = AsyncOpenAI(base_url=config.NVIDIA_BASE_URL, api_key=api_key, timeout=20.0)
+        provider = OpenAIProvider(openai_client=client)
+        model = OpenAIChatModel(config.MODEL_RESEARCH, provider=provider)
+        agent = Agent(
+            model,
+            retries=3,
+            deps_type=AgentDeps,
+            output_type=ResearchDraft,
+            system_prompt=_SYSTEM_PROMPT,
         )
-    )
 
-    @research_agent.tool
-    async def search_web_tool(ctx: RunContext[AgentDeps], query: str) -> str:
-        """
-        Search the web for up-to-date news, reports, tables, or fact checks matching the query.
-        Use this tool to find evidence related to the claim.
-        """
-        return await search_web(query)
+        @agent.tool
+        async def search_web_tool(ctx: RunContext[AgentDeps], query: str) -> str:
+            """Search the web for up-to-date news, reports, or fact checks matching the query."""
+            return await search_web(query)
 
-    @research_agent.system_prompt
-    def add_runtime_instructions(ctx: RunContext[AgentDeps]) -> str:
-        return ctx.deps.instructions
+        @agent.system_prompt
+        def add_runtime_instructions(ctx: RunContext[AgentDeps]) -> str:
+            return ctx.deps.instructions
 
-except Exception as e:
-    logger.error(f"Failed to initialize research agent: {e}")
-    research_agent = None
+        return agent
+    except Exception as e:
+        logger.error(f"Failed to build research agent: {e}")
+        return None
+
+
+# Module-level agent — rebuilt on NVIDIA key rotation
+research_agent = _make_research_agent(api_keys.nvidia_keys.current)
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
 
 async def run_research(claim_text: str, angle: str) -> ResearchDraft:
     """
-    Executes a web research agent with customized guidelines based on the research angle.
-    Angles: 'general_news', 'official_data', 'fact_check_sites'
+    Runs a web research agent for the given angle.
+    Rotates through NVIDIA_API_KEY_1 … NVIDIA_API_KEY_8 on any API failure.
+    Angles: 'general_news' | 'official_data' | 'fact_check_sites'
     """
-    if not research_agent:
-        logger.error("Research agent not initialized. Returning empty draft.")
-        return ResearchDraft(stance="missing_evidence", confidence=0.0, evidence_summary="Agent uninitialized.", sources=[])
+    global research_agent
+
+    _EMPTY = ResearchDraft(
+        stance="missing_evidence", confidence=0.0,
+        evidence_summary="Research agent failed on all API keys.", sources=[]
+    )
+
+    if not api_keys.nvidia_keys:
+        logger.error("No NVIDIA API keys configured.")
+        return _EMPTY
 
     if angle == "general_news":
         instr = (
@@ -170,18 +204,27 @@ async def run_research(claim_text: str, angle: str) -> ResearchDraft:
     else:
         instr = "Research the claim thoroughly using the web search tool."
 
-    logger.info(f"Running research agent ({angle}) for claim: '{claim_text}'")
     deps = AgentDeps(instructions=instr)
-    
-    try:
-        async with config.llm_semaphore:
-            result = await research_agent.run(claim_text, deps=deps)
-        return result.output
-    except Exception as e:
-        logger.error(f"Research agent ({angle}) execution failed: {e}")
-        return ResearchDraft(
-            stance="missing_evidence",
-            confidence=0.0,
-            evidence_summary=f"Research agent failed: {e}",
-            sources=[]
-        )
+    logger.info(f"Running research agent ({angle}) for: '{claim_text}'")
+
+    for _ in range(len(api_keys.nvidia_keys)):
+        agent = research_agent
+        if agent is None:
+            logger.error("Research agent could not be initialized.")
+            return _EMPTY
+        try:
+            async with config.llm_semaphore:
+                result = await agent.run(claim_text, deps=deps)
+            return result.output
+        except Exception as e:
+            logger.error(
+                f"Research agent ({angle}) failed "
+                f"(key #{api_keys.nvidia_keys.active_index}): {e}"
+            )
+
+        if not api_keys.nvidia_keys.rotate():
+            break
+        research_agent = _make_research_agent(api_keys.nvidia_keys.current)
+
+    logger.error(f"Research agent ({angle}) failed on all NVIDIA API keys.")
+    return _EMPTY

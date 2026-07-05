@@ -1,21 +1,28 @@
 import logging
-import uuid
-import asyncio
+import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-import config
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
 import stt
 import claim_detection
 import cache
-import queue_manager
-from session import SessionState
-
-import os
-from logging.handlers import RotatingFileHandler
+from agents.research_agent import run_research
+from agents.debate import run_debate_for_agent
+from agents.judge import run_judge
+from schemas import (
+    STTRequest, STTResponse,
+    DetectClaimsRequest, DetectClaimsResponse,
+    ResearchRequest, ResearchDraft,
+    DebateRequest, JudgeRequest, JudgeVerdict,
+    CacheLookupRequest, CacheLookupResponse,
+    StoreVerdictRequest
+)
 
 # Set up logging configuration
 log_dir = "logs"
 os.makedirs(log_dir, exist_ok=True)
+from logging.handlers import RotatingFileHandler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,174 +37,108 @@ logger = logging.getLogger("backend")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize cache database on startup
-    cache.init_db()
-    
-    # Start pipeline queue workers
-    queue_manager.start_workers()
-    
+    await cache.init_db()
     yield
-    
-    # Clean up pipeline queue workers on shutdown
-    await queue_manager.stop_workers()
+    # Close database connection pool
+    await cache.close_db()
 
-app = FastAPI(title="FactCheck AI Backend", lifespan=lifespan)
+app = FastAPI(title="FactCheck AI REST Backend", lifespan=lifespan)
 
-async def transcript_buffer_loop(session: SessionState, websocket: WebSocket):
-    logger.info(f"Starting transcript buffer loop for session {session.session_id}")
-    try:
-        while session.active:
-            # Wake up every N seconds (e.g. 20s)
-            await asyncio.sleep(config.CLAIM_DETECTION_WINDOW_SECONDS)
-            window_text = await session.pop_buffer()
-            if not window_text.strip():
-                continue
-            
-            logger.info(f"Checking transcript buffer window: '{window_text}'")
-            claims = await claim_detection.detect_claims(window_text)
-            
-            for claim_text in claims:
-                claim_id = f"claim_{uuid.uuid4().hex[:8]}"
-                logger.info(f"Factual claim detected: '{claim_text}' (ID: {claim_id})")
-                
-                # Check Semantic Cache — get embedding first, reuse for both cache lookup and queue
-                embedding = await cache.get_embedding(claim_text)
-                if not embedding:
-                    logger.warning(f"Could not get embedding for claim '{claim_text}'. Skipping.")
-                    continue
-
-                cached = await cache.search_cache_by_embedding(embedding)
-                if cached:
-                    logger.info(f"Cache Hit! Returning cached verdict for: '{claim_text}'")
-                    verdict_msg = {
-                        "type": "verdict_update",
-                        "claim_id": claim_id,
-                        "claim_text": claim_text,
-                        "verdict": cached["verdict"],
-                        "explanation": cached["explanation"],
-                        "sources": cached["sources"],
-                        "cached": True
-                    }
-                    await websocket.send_json(verdict_msg)
-                    continue
-
-                # Cache Miss - Send checking status update
-                status_msg = {
-                    "type": "status_update",
-                    "claim_id": claim_id,
-                    "claim_text": claim_text,
-                    "status": "checking"
-                }
-                await websocket.send_json(status_msg)
-                
-                # Enqueue the claim into the multi-agent processing pipeline
-                await queue_manager.enqueue_claim(
-                    claim_id=claim_id,
-                    claim_text=claim_text,
-                    embedding=embedding,
-                    websocket=websocket,
-                    session=session
-                )
-                
-    except asyncio.CancelledError:
-        logger.info(f"Transcript buffer loop cancelled for session {session.session_id}")
-    except Exception as e:
-        logger.error(f"Error in transcript buffer loop: {e}")
+# Allow CORS for Chrome Extension
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def read_root():
-    return {"message": "FactCheck AI Backend is running"}
+    return {"message": "FactCheck AI REST Backend is running"}
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    session_id = str(uuid.uuid4())
-    session = SessionState(session_id=session_id)
-    logger.info(f"WebSocket connection accepted. Session ID: {session_id}")
+@app.post("/api/stt", response_model=STTResponse)
+async def api_stt(req: STTRequest):
+    """Decodes base64 audio and translates it to English text."""
+    if not req.audio_base64:
+        return STTResponse(text="")
     
-    # Spawn background task to process accumulated transcript buffers
-    loop_task = asyncio.create_task(transcript_buffer_loop(session, websocket))
+    text = await stt.transcribe_audio(req.audio_base64)
+    return STTResponse(text=text)
+
+@app.post("/api/detect_claims", response_model=DetectClaimsResponse)
+async def api_detect_claims(req: DetectClaimsRequest):
+    """Extracts verifiable claims from a rolling transcript window."""
+    if not req.transcript_window.strip():
+        return DetectClaimsResponse(claims=[])
     
+    claims = await claim_detection.detect_claims(req.transcript_window)
+    return DetectClaimsResponse(claims=claims)
+
+@app.post("/api/cache_lookup", response_model=CacheLookupResponse)
+async def api_cache_lookup(req: CacheLookupRequest):
+    """Checks the semantic cache for an already fact-checked claim."""
+    embedding = await cache.get_embedding(req.claim_text)
+    if not embedding:
+        return CacheLookupResponse(cached=False)
+    
+    cached = await cache.search_cache_by_embedding(embedding)
+    if cached:
+        return CacheLookupResponse(
+            cached=True,
+            verdict=cached["verdict"],
+            explanation=cached["explanation"],
+            sources=cached["sources"]
+        )
+    return CacheLookupResponse(cached=False)
+
+@app.post("/api/research", response_model=ResearchDraft)
+async def api_research(req: ResearchRequest):
+    """Runs a single research agent for a specific angle."""
     try:
-        while True:
-            data = await websocket.receive_json()
-            msg_type = data.get("type")
-            
-            if msg_type == "keepalive":
-                logger.info("Received keepalive from client.")
-            elif msg_type == "caption_chunk":
-                text = data.get("text", "")
-                timestamp = data.get("timestamp_ms")
-                logger.info(f"Received caption chunk at {timestamp}: '{text}'")
-                await session.append_text(text)
-            elif msg_type == "audio_chunk":
-                audio_base64 = data.get("audio_base64", "")
-                fmt = data.get("format", "")
-                timestamp = data.get("timestamp_ms")
-                logger.info(f"Received audio chunk at {timestamp}: base64 len={len(audio_base64)}, format={fmt}")
-                
-                if not audio_base64:
-                    logger.warning("Received empty audio chunk, skipping transcription.")
-                    continue
-                
-                # Perform transcription
-                transcribed_text = await stt.transcribe_audio(audio_base64)
-                if transcribed_text:
-                    logger.info(f"Transcribed audio chunk to: '{transcribed_text}'")
-                    await session.append_text(transcribed_text)
-                    await websocket.send_json({
-                        "type": "transcription",
-                        "text": transcribed_text
-                    })
-                else:
-                    logger.info("Audio chunk transcription resolved to empty text.")
-            elif msg_type == "manual_claim":
-                text = data.get("text", "").strip()
-                if not text:
-                    continue
-                claim_id = f"manual_{uuid.uuid4().hex[:8]}"
-                logger.info(f"Manual claim submitted: '{text}' (ID: {claim_id})")
-            
-                embedding = await cache.get_embedding(text)
-                if not embedding:
-                    continue
-            
-                cached = await cache.search_cache_by_embedding(embedding)
-                if cached:
-                    await websocket.send_json({
-                        "type": "verdict_update",
-                        "claim_id": claim_id,
-                        "claim_text": text,
-                        "verdict": cached["verdict"],
-                        "explanation": cached["explanation"],
-                        "sources": cached["sources"],
-                        "cached": True
-                    })
-                    continue
-            
-                await websocket.send_json({
-                    "type": "status_update",
-                    "claim_id": claim_id,
-                    "claim_text": text,
-                    "status": "checking"
-                })
-                await queue_manager.enqueue_claim(
-                    claim_id=claim_id,
-                    claim_text=text,
-                    embedding=embedding,
-                    websocket=websocket,
-                    session=session
-                )
-            else:
-                logger.info(f"Received generic message: {data}")
-            
-    except WebSocketDisconnect:
-        logger.info(f"WebSocket session {session_id} disconnected gracefully.")
+        draft = await run_research(req.claim_text, req.angle)
+        return draft
     except Exception as e:
-        logger.error(f"WebSocket error encountered on session {session_id}: {e}")
-    finally:
-        await session.close()
-        loop_task.cancel()
-        try:
-            await loop_task
-        except asyncio.CancelledError:
-            pass
+        logger.error(f"Research error for angle {req.angle}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/debate", response_model=ResearchDraft)
+async def api_debate(req: DebateRequest):
+    """Runs the debate revision round for a single agent."""
+    other_drafts_list = list(req.other_drafts.items())
+    try:
+        revised = await run_debate_for_agent(
+            claim_text=req.claim_text,
+            angle=req.angle,
+            self_draft=req.self_draft,
+            other_drafts=other_drafts_list
+        )
+        return revised
+    except Exception as e:
+        logger.error(f"Debate error for angle {req.angle}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/judge", response_model=JudgeVerdict)
+async def api_judge(req: JudgeRequest):
+    """Synthesizes final verdict from the revised drafts."""
+    try:
+        verdict = await run_judge(req.claim_text, req.revised_drafts)
+        return verdict
+    except Exception as e:
+        logger.error(f"Judge error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/cache")
+async def api_store_cache(req: StoreVerdictRequest):
+    """Stores a finalized verdict in the semantic cache."""
+    embedding = await cache.get_embedding(req.claim_text)
+    sources_dict = [s.model_dump() for s in req.verdict_data.sources]
+    
+    await cache.store_verdict(
+        claim_text=req.claim_text,
+        embedding=embedding,
+        verdict=req.verdict_data.verdict,
+        explanation=req.verdict_data.explanation,
+        sources=sources_dict
+    )
+    return {"status": "ok"}

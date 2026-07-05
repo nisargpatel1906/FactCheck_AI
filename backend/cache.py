@@ -1,208 +1,257 @@
-from __future__ import annotations  # allows list[float] | None syntax on Python 3.8/3.9
+from __future__ import annotations
 import json
-import sqlite3
-import logging
 import asyncio
+import logging
 import httpx
-import sqlite_vec
 import config
+import api_keys
 
 logger = logging.getLogger("backend.cache")
 
-def init_db():
-    """
-    Initializes the SQLite database and loads the sqlite-vec extension.
-    Creates necessary tables if they do not exist.
-    """
-    try:
-        conn = sqlite3.connect(config.DATABASE_PATH)
-        # Enable WAL mode for concurrency
-        conn.execute("PRAGMA journal_mode=WAL;")
-        
-        # Enable extension loading and load the sqlite-vec extension.
-        # Note: some Python builds (Ubuntu/Debian system Python, Homebrew) compile SQLite
-        # with SQLITE_OMIT_LOAD_EXTENSION, which disables enable_load_extension().
-        # If this raises AttributeError, the user must install Python from python.org
-        # or use a venv created from a full Python build.
-        try:
-            conn.enable_load_extension(True)
-        except AttributeError:
-            raise RuntimeError(
-                "Your Python's SQLite was compiled without extension loading support.\n"
-                "Fix: install Python from https://www.python.org/downloads/ (not your OS package manager)\n"
-                "     or on macOS: use 'brew install python' then recreate the virtualenv."
-            )
-        sqlite_vec.load(conn)
-        conn.enable_load_extension(False)  # re-disable for security after loading
-        
-        cursor = conn.cursor()
-        
-        # 1. Create traditional metadata table
-        cursor.execute("""
+# Detect which backend to use at import time — avoids per-call branching overhead
+_USE_POSTGRES = bool(config.DATABASE_URL)
+
+# asyncpg connection pool (PostgreSQL only)
+_pg_pool = None
+
+
+# ── Shared utility ────────────────────────────────────────────────────────────
+
+def _vec_literal(embedding: list[float]) -> str:
+    """Format a float list as a pgvector text literal, e.g. '[0.1,0.2,...]'."""
+    return f"[{','.join(str(v) for v in embedding)}]"
+
+
+# ── PostgreSQL path ───────────────────────────────────────────────────────────
+
+async def _pg_init() -> None:
+    global _pg_pool
+    import asyncpg
+    _pg_pool = await asyncpg.create_pool(config.DATABASE_URL)
+    async with _pg_pool.acquire() as conn:
+        await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS claims (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id         BIGSERIAL PRIMARY KEY,
                 claim_text TEXT NOT NULL,
-                verdict TEXT NOT NULL,
+                verdict    TEXT NOT NULL,
                 explanation TEXT NOT NULL,
-                sources TEXT NOT NULL, -- Stored as JSON array string
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                sources    TEXT NOT NULL,
+                embedding  vector(1024) NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
             )
         """)
-        
-        # 2. Create sqlite-vec virtual table for fast cosine similarity search
-        # Dimension is 1024 for nvidia/embeddings-nv-embed-qa-4
-        cursor.execute("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS claim_embeddings USING vec0(
-                embedding float[1024] distance_metric=cosine
-            )
+        # HNSW index — works well at any dataset size, no minimum row count required
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS claims_embedding_hnsw
+            ON claims USING hnsw (embedding vector_cosine_ops)
         """)
-        
-        conn.commit()
-        conn.close()
-        logger.info(f"Database initialized successfully at: {config.DATABASE_PATH}")
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
+    logger.info("PostgreSQL database initialised successfully.")
 
-async def get_embedding(text: str) -> list[float]:
-    """
-    Calls the NVIDIA NIM embedding API catalog endpoint to generate a vector for the input text.
-    """
-    if not config.NVIDIA_API_KEY:
-        logger.error("NVIDIA_API_KEY is not set. Cannot generate embedding.")
-        return []
 
-    try:
-        url = f"{config.NVIDIA_BASE_URL}/embeddings"
-        headers = {
-            "Authorization": f"Bearer {config.NVIDIA_API_KEY}",
-            "Content-Type": "application/json"
+async def _pg_search(embedding: list[float]) -> dict | None:
+    vec = _vec_literal(embedding)
+    max_dist = 1.0 - config.SIMILARITY_THRESHOLD
+    async with _pg_pool.acquire() as conn:
+        row = await conn.fetchrow(f"""
+            SELECT id, claim_text, verdict, explanation, sources,
+                   (embedding <=> '{vec}'::vector) AS distance
+            FROM   claims
+            WHERE  (embedding <=> '{vec}'::vector) < $1
+            ORDER  BY embedding <=> '{vec}'::vector ASC
+            LIMIT  1
+        """, max_dist)
+    if row:
+        logger.info(f"Semantic Cache Hit! Distance: {row['distance']:.4f}")
+        return {
+            "claim_id":    f"claim_cached_{row['id']}",
+            "claim_text":  row["claim_text"],
+            "verdict":     row["verdict"],
+            "explanation": row["explanation"],
+            "sources":     json.loads(row["sources"]),
         }
-        payload = {
-            "input": [text],
-            "model": config.MODEL_EMBEDDING,
-            "input_type": "query"
-        }
+    return None
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=payload, timeout=10.0)
 
-        if response.status_code != 200:
-            logger.error(f"NVIDIA Embeddings API error {response.status_code}: {response.text}")
-            return []
+async def _pg_store(claim_text: str, embedding: list[float],
+                    verdict: str, explanation: str, sources: list) -> None:
+    vec = _vec_literal(embedding)
+    async with _pg_pool.acquire() as conn:
+        await conn.execute(f"""
+            INSERT INTO claims (claim_text, verdict, explanation, sources, embedding)
+            VALUES ($1, $2, $3, $4, '{vec}'::vector)
+        """, claim_text, verdict, explanation, json.dumps(sources))
+    logger.info(f"Cached claim in PostgreSQL: '{claim_text}'")
 
-        result = response.json()
-        embedding = result.get("data", [{}])[0].get("embedding", [])
-        return embedding
-    except Exception as e:
-        logger.error(f"Failed to retrieve text embedding: {e}")
-        return []
 
-def _sync_search_cache(embedding: list[float]) -> dict | None:
-    """
-    Synchronous helper for database semantic matching. Runs inside an executor.
-    """
-    # ponytail: new connection per call is intentional — sqlite3 connections aren't thread-safe
-    # and this runs in asyncio.to_thread(). Upgrade path: thread-local connection pool.
+async def _pg_close() -> None:
+    if _pg_pool:
+        await _pg_pool.close()
+
+
+# ── SQLite path (local dev fallback) ─────────────────────────────────────────
+
+def _get_sqlite_conn():
+    """Open a fresh SQLite connection with sqlite_vec loaded."""
+    import sqlite3
+    import sqlite_vec
+    conn = sqlite3.connect(config.DATABASE_PATH)
     try:
-        conn = sqlite3.connect(config.DATABASE_PATH)
-        try:
-            conn.enable_load_extension(True)
-        except AttributeError:
-            raise RuntimeError("SQLite extension loading not supported. See startup error for fix.")
-        sqlite_vec.load(conn)
-        conn.enable_load_extension(False)
-        cursor = conn.cursor()
-        
-        # Convert float list to JSON array string for MATCH operator
+        conn.enable_load_extension(True)
+    except AttributeError:
+        raise RuntimeError(
+            "SQLite extension loading not supported.\n"
+            "Fix: install Python from https://www.python.org/downloads/"
+        )
+    sqlite_vec.load(conn)
+    conn.enable_load_extension(False)
+    return conn
+
+
+def _sqlite_init() -> None:
+    conn = _get_sqlite_conn()
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS claims (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            claim_text  TEXT NOT NULL,
+            verdict     TEXT NOT NULL,
+            explanation TEXT NOT NULL,
+            sources     TEXT NOT NULL,
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS claim_embeddings USING vec0(
+            embedding float[1024] distance_metric=cosine
+        )
+    """)
+    conn.commit()
+    conn.close()
+    logger.info(f"SQLite database initialised at: {config.DATABASE_PATH}")
+
+
+def _sqlite_search(embedding: list[float]) -> dict | None:
+    try:
+        conn = _get_sqlite_conn()
         json_emb = json.dumps(embedding)
-        max_distance = 1.0 - config.SIMILARITY_THRESHOLD
-        
-        # Search the vec0 table and join with metadata table
-        cursor.execute("""
-            SELECT 
-                c.id, 
-                c.claim_text, 
-                c.verdict, 
-                c.explanation, 
-                c.sources, 
-                v.distance
-            FROM claim_embeddings v
-            JOIN claims c ON c.id = v.rowid
-            WHERE v.embedding MATCH ? AND k = 1 AND v.distance < ?
-            ORDER BY v.distance ASC
-            LIMIT 1
-        """, (json_emb, max_distance))
-        
-        row = cursor.fetchone()
+        max_dist = 1.0 - config.SIMILARITY_THRESHOLD
+        row = conn.execute("""
+            SELECT c.id, c.claim_text, c.verdict, c.explanation, c.sources, v.distance
+            FROM   claim_embeddings v
+            JOIN   claims c ON c.id = v.rowid
+            WHERE  v.embedding MATCH ? AND k = 1 AND v.distance < ?
+            ORDER  BY v.distance ASC
+            LIMIT  1
+        """, (json_emb, max_dist)).fetchone()
         conn.close()
-        
         if row:
-            logger.info(f"Semantic Cache Hit! Distance: {row[5]:.4f} (Similarity: {1.0 - row[5]:.4f})")
+            logger.info(f"Semantic Cache Hit! Distance: {row[5]:.4f}")
             return {
-                "claim_id": f"claim_cached_{row[0]}",
-                "claim_text": row[1],
-                "verdict": row[2],
+                "claim_id":    f"claim_cached_{row[0]}",
+                "claim_text":  row[1],
+                "verdict":     row[2],
                 "explanation": row[3],
-                "sources": json.loads(row[4])
+                "sources":     json.loads(row[4]),
             }
         return None
     except Exception as e:
-        logger.error(f"Synchronous cache search failed: {e}")
+        logger.error(f"SQLite cache search failed: {e}")
         return None
 
-async def search_cache_by_embedding(embedding: list[float]) -> dict | None:
-    """
-    Searches the SQLite cache using a pre-computed embedding vector.
-    Returns the cached claim dictionary if a match above the similarity threshold is found, else None.
-    """
-    if not embedding:
-        return None
-    return await asyncio.to_thread(_sync_search_cache, embedding)
 
-def _sync_store_verdict(claim_text: str, embedding: list[float], verdict: str, explanation: str, sources: list) -> None:
-    """
-    Synchronous helper to store verdict metadata and embedding in SQLite. Runs in executor.
-    """
+def _sqlite_store(claim_text: str, embedding: list[float],
+                  verdict: str, explanation: str, sources: list) -> None:
     try:
-        conn = sqlite3.connect(config.DATABASE_PATH)
-        try:
-            conn.enable_load_extension(True)
-        except AttributeError:
-            raise RuntimeError("SQLite extension loading not supported. See startup error for fix.")
-        sqlite_vec.load(conn)
-        conn.enable_load_extension(False)
-        cursor = conn.cursor()
-        
-        # 1. Insert into metadata table
-        cursor.execute("""
+        conn = _get_sqlite_conn()
+        cur = conn.cursor()
+        cur.execute("""
             INSERT INTO claims (claim_text, verdict, explanation, sources)
             VALUES (?, ?, ?, ?)
         """, (claim_text, verdict, explanation, json.dumps(sources)))
-        
-        claim_id = cursor.lastrowid
-        
-        # 2. Insert vector into vec0 table matching rowid
-        json_emb = json.dumps(embedding)
-        cursor.execute("""
-            INSERT INTO claim_embeddings (rowid, embedding)
-            VALUES (?, ?)
-        """, (claim_id, json_emb))
-        
+        claim_id = cur.lastrowid
+        cur.execute(
+            "INSERT INTO claim_embeddings (rowid, embedding) VALUES (?, ?)",
+            (claim_id, json.dumps(embedding))
+        )
         conn.commit()
         conn.close()
-        logger.info(f"Successfully cached claim '{claim_text}' with ID: {claim_id}")
+        logger.info(f"Cached claim in SQLite: '{claim_text}'")
     except Exception as e:
-        logger.error(f"Synchronous cache store failed: {e}")
+        logger.error(f"SQLite cache store failed: {e}")
 
-async def store_verdict(claim_text: str, embedding: list[float] | None, verdict: str, explanation: str, sources: list) -> None:
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+async def init_db() -> None:
+    if _USE_POSTGRES:
+        await _pg_init()
+    else:
+        await asyncio.to_thread(_sqlite_init)
+
+
+async def close_db() -> None:
+    if _USE_POSTGRES:
+        await _pg_close()
+
+
+async def get_embedding(text: str) -> list[float]:
     """
-    Asynchronously stores a newly generated claim verdict and its embedding vector.
+    Calls the NVIDIA NIM embedding API to generate a 1024-dim vector.
+    Rotates through NVIDIA_API_KEY_1 … NVIDIA_API_KEY_8 on any failure.
     """
-    # If embedding is not provided, fetch it now
+    if not api_keys.nvidia_keys:
+        logger.error("No NVIDIA API keys configured. Cannot generate embedding.")
+        return []
+
+    for _ in range(len(api_keys.nvidia_keys)):
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{config.NVIDIA_BASE_URL}/embeddings",
+                    headers={"Authorization": f"Bearer {api_keys.nvidia_keys.current}"},
+                    json={
+                        "input": [text],
+                        "model": config.MODEL_EMBEDDING,
+                        "input_type": "query",
+                    },
+                    timeout=10.0,
+                )
+            if response.status_code == 200:
+                return response.json().get("data", [{}])[0].get("embedding", [])
+            logger.error(
+                f"NVIDIA Embeddings API error {response.status_code} "
+                f"(key #{api_keys.nvidia_keys.active_index}): {response.text}"
+            )
+        except Exception as e:
+            logger.error(
+                f"NVIDIA Embeddings exception "
+                f"(key #{api_keys.nvidia_keys.active_index}): {e}"
+            )
+
+        if not api_keys.nvidia_keys.rotate():
+            break
+
+    logger.error("Embedding generation failed on all NVIDIA API keys.")
+    return []
+
+
+async def search_cache_by_embedding(embedding: list[float]) -> dict | None:
+    if not embedding:
+        return None
+    if _USE_POSTGRES:
+        return await _pg_search(embedding)
+    return await asyncio.to_thread(_sqlite_search, embedding)
+
+
+async def store_verdict(claim_text: str, embedding: list[float] | None,
+                        verdict: str, explanation: str, sources: list) -> None:
     if not embedding:
         embedding = await get_embedding(claim_text)
         if not embedding:
-            logger.warning(f"Could not retrieve embedding for storing claim: '{claim_text}'. Skipping caching.")
+            logger.warning(f"Could not get embedding for '{claim_text}'. Skipping cache.")
             return
-
-    await asyncio.to_thread(_sync_store_verdict, claim_text, embedding, verdict, explanation, sources)
+    if _USE_POSTGRES:
+        await _pg_store(claim_text, embedding, verdict, explanation, sources)
+    else:
+        await asyncio.to_thread(_sqlite_store, claim_text, embedding, verdict, explanation, sources)

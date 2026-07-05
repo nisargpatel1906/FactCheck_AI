@@ -1,8 +1,9 @@
 import logging
 import asyncio
 import config
+import api_keys
 from schemas import ResearchDraft
-from agents.research_agent import research_agent, AgentDeps
+import agents.research_agent as research_agent_mod
 
 logger = logging.getLogger("backend.debate")
 
@@ -13,21 +14,17 @@ async def run_debate_for_agent(
     other_drafts: list[tuple[str, ResearchDraft]]
 ) -> ResearchDraft:
     """
-    Runs a single agent's debate revision round by presenting other agents' drafts.
+    Runs a single agent's debate revision round.
+    Rotates NVIDIA keys on failure, same as run_research().
     """
-    if not research_agent:
-        return self_draft
-
-    # Formulate other drafts representation
-    other_drafts_text = ""
-    for other_angle, draft in other_drafts:
-        other_drafts_text += (
-            f"[{other_angle.replace('_', ' ').title()} Agent]\n"
-            f"- Stance: {draft.stance}\n"
-            f"- Confidence: {draft.confidence}\n"
-            f"- Evidence:\n{draft.evidence_summary}\n"
-            f"- Sources: {', '.join([s.url for s in draft.sources])}\n\n"
-        )
+    other_drafts_text = "".join(
+        f"[{other_angle.replace('_', ' ').title()} Agent]\n"
+        f"- Stance: {draft.stance}\n"
+        f"- Confidence: {draft.confidence}\n"
+        f"- Evidence:\n{draft.evidence_summary}\n"
+        f"- Sources: {', '.join(s.url for s in draft.sources)}\n\n"
+        for other_angle, draft in other_drafts
+    )
 
     user_prompt = (
         f"You previously investigated the claim: '{claim_text}' "
@@ -55,15 +52,35 @@ async def run_debate_for_agent(
         "If one agent has a .gov source confirming a number and another has a blog post denying it, the .gov source wins."
     )
 
-    try:
-        deps = AgentDeps(instructions=instr)
-        async with config.llm_semaphore:
-            result = await research_agent.run(user_prompt, deps=deps)
-        logger.info(f"Debate round complete for '{angle}'. Stance: '{self_draft.stance}' -> '{result.output.stance}'")
-        return result.output
-    except Exception as e:
-        logger.error(f"Agent '{angle}' debate round failed: {e}")
-        return self_draft
+    deps = research_agent_mod.AgentDeps(instructions=instr)
+
+    for _ in range(len(api_keys.nvidia_keys)):
+        # Always read the module-level variable — it gets rebuilt after rotation
+        agent = research_agent_mod.research_agent
+        if agent is None:
+            return self_draft
+        try:
+            async with config.llm_semaphore:
+                result = await agent.run(user_prompt, deps=deps)
+            logger.info(
+                f"Debate round complete for '{angle}'. "
+                f"Stance: '{self_draft.stance}' -> '{result.output.stance}'"
+            )
+            return result.output
+        except Exception as e:
+            logger.error(
+                f"Agent '{angle}' debate round failed "
+                f"(key #{api_keys.nvidia_keys.active_index}): {e}"
+            )
+
+        if not api_keys.nvidia_keys.rotate():
+            break
+        research_agent_mod.research_agent = research_agent_mod._make_research_agent(
+            api_keys.nvidia_keys.current
+        )
+
+    logger.error(f"Debate round for '{angle}' failed on all NVIDIA API keys.")
+    return self_draft
 
 async def run_debate_round(claim_text: str, drafts: dict[str, ResearchDraft]) -> dict[str, ResearchDraft]:
     """

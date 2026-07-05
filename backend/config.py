@@ -23,6 +23,8 @@ MODEL_EMBEDDING = os.getenv("MODEL_EMBEDDING", "nvidia/nv-embedqa-e5-v5")
 MODEL_STT = os.getenv("MODEL_STT", "openai/whisper-large-v3")
 
 # Cache & Storage
+# If DATABASE_URL is set, PostgreSQL is used. Otherwise falls back to local SQLite.
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 DATABASE_PATH = os.getenv("DATABASE_PATH", str(BASE_DIR / "factcheck.db"))
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.85"))
 

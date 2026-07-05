@@ -29,13 +29,16 @@ port.onMessage.addListener((message) => {
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "connection-status-update") {
     const connectionStatus = document.getElementById("connection-status");
+    const warning = document.getElementById("backend-warning");
     if (connectionStatus) {
       if (message.connected) {
         connectionStatus.innerText = "Connected";
         connectionStatus.className = "status-pill status-connected";
+        if (warning) warning.classList.add("hidden");
       } else {
         connectionStatus.innerText = "Disconnected";
         connectionStatus.className = "status-pill status-disconnected";
+        if (warning) warning.classList.remove("hidden");
       }
     }
   } else if (message.type === "status_update") {
@@ -103,14 +106,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const enableOverlayCheckbox = document.getElementById("enable-overlay");
 
-  // Load initial checkbox state from chrome storage
-  chrome.storage.local.get(["audioCaptureEnabled", "showOverlay"], (result) => {
+  // Load initial checkbox + backend URL state from chrome storage
+  chrome.storage.local.get(["audioCaptureEnabled", "showOverlay", "backendUrl"], (result) => {
     if (result.audioCaptureEnabled !== undefined) {
       if (enableAudioCheckbox) enableAudioCheckbox.checked = result.audioCaptureEnabled;
       updatePowerBtnUI(result.audioCaptureEnabled);
     }
     if (result.showOverlay !== undefined) {
       enableOverlayCheckbox.checked = result.showOverlay;
+    }
+    const backendUrlInput = document.getElementById("backend-url");
+    if (backendUrlInput) {
+      backendUrlInput.value = result.backendUrl || "ws://localhost:8000/ws";
     }
   });
 
@@ -119,6 +126,29 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(`[Popup] Overlay checkbox toggled to: ${isEnabled}`);
     chrome.storage.local.set({ showOverlay: isEnabled });
   });
+
+  // Save backend URL and ask service worker to reconnect
+  const saveBackendUrlBtn = document.getElementById("save-backend-url");
+  if (saveBackendUrlBtn) {
+    saveBackendUrlBtn.addEventListener("click", () => {
+      const input = document.getElementById("backend-url");
+      const url = (input ? input.value : "").trim() || "ws://localhost:8000/ws";
+      chrome.storage.local.set({ backendUrl: url }, () => {
+        chrome.runtime.sendMessage({ type: "reconnect-backend" });
+        saveBackendUrlBtn.innerText = "Saved!";
+        setTimeout(() => { saveBackendUrlBtn.innerText = "Save & Reconnect"; }, 1500);
+      });
+    });
+  }
+
+  // "Change URL" link in warning banner jumps to Settings tab
+  const openSettingsLink = document.getElementById("open-settings-link");
+  if (openSettingsLink) {
+    openSettingsLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      document.getElementById("tab-settings")?.click();
+    });
+  }
 
   // Query background script connection status
   chrome.runtime.sendMessage({ type: "get-connection-status" }, (response) => {
