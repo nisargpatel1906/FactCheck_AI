@@ -26,15 +26,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("backend")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Initialize cache database on startup
-    await cache.init_db()
-    yield
-    # Close database connection pool
-    await cache.close_db()
-
-app = FastAPI(title="FactCheck AI REST Backend", lifespan=lifespan)
+app = FastAPI(title="FactCheck AI REST Backend")
 
 # Allow CORS for Chrome Extension
 app.add_middleware(

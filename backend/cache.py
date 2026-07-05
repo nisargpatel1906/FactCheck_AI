@@ -24,35 +24,19 @@ def _vec_literal(embedding: list[float]) -> str:
 
 # ── PostgreSQL path ───────────────────────────────────────────────────────────
 
-async def _pg_init() -> None:
+async def _get_pg_pool():
     global _pg_pool
-    import asyncpg
-    _pg_pool = await asyncpg.create_pool(config.DATABASE_URL)
-    async with _pg_pool.acquire() as conn:
-        await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS claims (
-                id         BIGSERIAL PRIMARY KEY,
-                claim_text TEXT NOT NULL,
-                verdict    TEXT NOT NULL,
-                explanation TEXT NOT NULL,
-                sources    TEXT NOT NULL,
-                embedding  vector(1024) NOT NULL,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            )
-        """)
-        # HNSW index — works well at any dataset size, no minimum row count required
-        await conn.execute("""
-            CREATE INDEX IF NOT EXISTS claims_embedding_hnsw
-            ON claims USING hnsw (embedding vector_cosine_ops)
-        """)
-    logger.info("PostgreSQL database initialised successfully.")
+    if _pg_pool is None:
+        import asyncpg
+        _pg_pool = await asyncpg.create_pool(config.DATABASE_URL, min_size=1, max_size=5)
+    return _pg_pool
 
 
 async def _pg_search(embedding: list[float]) -> dict | None:
     vec = _vec_literal(embedding)
     max_dist = 1.0 - config.SIMILARITY_THRESHOLD
-    async with _pg_pool.acquire() as conn:
+    pool = await _get_pg_pool()
+    async with pool.acquire() as conn:
         row = await conn.fetchrow(f"""
             SELECT id, claim_text, verdict, explanation, sources,
                    (embedding <=> '{vec}'::vector) AS distance
@@ -76,7 +60,8 @@ async def _pg_search(embedding: list[float]) -> dict | None:
 async def _pg_store(claim_text: str, embedding: list[float],
                     verdict: str, explanation: str, sources: list) -> None:
     vec = _vec_literal(embedding)
-    async with _pg_pool.acquire() as conn:
+    pool = await _get_pg_pool()
+    async with pool.acquire() as conn:
         await conn.execute(f"""
             INSERT INTO claims (claim_text, verdict, explanation, sources, embedding)
             VALUES ($1, $2, $3, $4, '{vec}'::vector)
@@ -184,9 +169,7 @@ def _sqlite_store(claim_text: str, embedding: list[float],
 # ── Public API ────────────────────────────────────────────────────────────────
 
 async def init_db() -> None:
-    if _USE_POSTGRES:
-        await _pg_init()
-    else:
+    if not _USE_POSTGRES:
         await asyncio.to_thread(_sqlite_init)
 
 
