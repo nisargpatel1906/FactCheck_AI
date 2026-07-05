@@ -238,3 +238,37 @@ async def store_verdict(claim_text: str, embedding: list[float] | None,
         await _pg_store(claim_text, embedding, verdict, explanation, sources)
     else:
         await asyncio.to_thread(_sqlite_store, claim_text, embedding, verdict, explanation, sources)
+
+
+class RateLimitExceeded(Exception):
+    pass
+
+async def _pg_check_rate_limit(device_id: str, limit: int = 15) -> None:
+    pool = await _get_pg_pool()
+    async with pool.acquire() as conn:
+        count = await conn.fetchval("""
+            INSERT INTO rate_limits (device_id, date_str, check_count)
+            VALUES ($1, TO_CHAR(NOW(), 'YYYY-MM-DD'), 1)
+            ON CONFLICT (device_id, date_str)
+            DO UPDATE SET check_count = rate_limits.check_count + 1
+            RETURNING check_count
+        """, device_id)
+        if count > limit:
+            # Revert the increment since they are blocked
+            await conn.execute("""
+                UPDATE rate_limits SET check_count = check_count - 1 
+                WHERE device_id = $1 AND date_str = TO_CHAR(NOW(), 'YYYY-MM-DD')
+            """, device_id)
+            raise RateLimitExceeded(f"Daily limit of {limit} statements reached.")
+
+def _sqlite_check_rate_limit(device_id: str, limit: int = 15) -> None:
+    pass
+
+async def check_and_increment_rate_limit(device_id: str, limit: int = 15) -> None:
+    if not device_id:
+        return
+    if _USE_POSTGRES:
+        await _pg_check_rate_limit(device_id, limit)
+    else:
+        await asyncio.to_thread(_sqlite_check_rate_limit, device_id, limit)
+

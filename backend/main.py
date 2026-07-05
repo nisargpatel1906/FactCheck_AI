@@ -87,6 +87,14 @@ async def api_cache_lookup(req: CacheLookupRequest):
             explanation=cached["explanation"],
             sources=cached["sources"]
         )
+    
+    # If not cached, the pipeline will proceed. Check and increment rate limit!
+    if req.device_id:
+        try:
+            await cache.check_and_increment_rate_limit(req.device_id, limit=15)
+        except cache.RateLimitExceeded as e:
+            raise HTTPException(status_code=429, detail=str(e))
+
     return CacheLookupResponse(cached=False)
 
 @app.post("/api/research", response_model=ResearchDraft)

@@ -63,6 +63,7 @@ class JudgeRequest(BaseModel):
 
 class CacheLookupRequest(BaseModel):
     claim_text: str
+    device_id: str | None = None
 
 class CacheLookupResponse(BaseModel):
     cached: bool

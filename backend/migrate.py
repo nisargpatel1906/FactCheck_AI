@@ -48,6 +48,14 @@ async def migrate() -> None:
             )
         """)
         await conn.execute("""
+            CREATE TABLE IF NOT EXISTS rate_limits (
+                device_id   TEXT NOT NULL,
+                date_str    TEXT NOT NULL,
+                check_count INTEGER DEFAULT 1,
+                PRIMARY KEY (device_id, date_str)
+            )
+        """)
+        await conn.execute("""
             CREATE INDEX IF NOT EXISTS claims_embedding_hnsw
             ON claims USING hnsw (embedding vector_cosine_ops)
         """)
