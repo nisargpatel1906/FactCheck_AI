@@ -5,7 +5,7 @@ import httpx
 from duckduckgo_search import DDGS
 from openai import AsyncOpenAI
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 import config
 import api_keys
@@ -126,12 +126,12 @@ def _make_research_agent(api_key: str) -> Agent | None:
     try:
         client = AsyncOpenAI(base_url=config.NVIDIA_BASE_URL, api_key=api_key, timeout=20.0)
         provider = OpenAIProvider(openai_client=client)
-        model = OpenAIChatModel(config.MODEL_RESEARCH, provider=provider)
+        model = OpenAIModel(config.MODEL_RESEARCH, provider=provider)
         agent = Agent(
             model,
             retries=3,
             deps_type=AgentDeps,
-            output_type=ResearchDraft,
+            result_type=ResearchDraft,
             system_prompt=_SYSTEM_PROMPT,
         )
 
