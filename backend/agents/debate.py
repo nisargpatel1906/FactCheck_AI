@@ -64,9 +64,9 @@ async def run_debate_for_agent(
                 result = await agent.run(user_prompt, deps=deps)
             logger.info(
                 f"Debate round complete for '{angle}'. "
-                f"Stance: '{self_draft.stance}' -> '{result.output.stance}'"
+                f"Stance: '{self_draft.stance}' -> '{result.data.stance}'"
             )
-            return result.output
+            return result.data
         except Exception as e:
             logger.error(
                 f"Agent '{angle}' debate round failed "

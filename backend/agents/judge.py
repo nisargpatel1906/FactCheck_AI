@@ -104,7 +104,7 @@ async def run_judge(claim_text: str, revised_drafts: dict[str, ResearchDraft]) -
         try:
             async with config.llm_semaphore:
                 result = await agent.run(user_prompt)
-            return result.output
+            return result.data
         except Exception as e:
             logger.error(
                 f"Judge agent failed (key #{api_keys.nvidia_keys.active_index}): {e}"

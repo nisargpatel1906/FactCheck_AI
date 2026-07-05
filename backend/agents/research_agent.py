@@ -215,7 +215,7 @@ async def run_research(claim_text: str, angle: str) -> ResearchDraft:
         try:
             async with config.llm_semaphore:
                 result = await agent.run(claim_text, deps=deps)
-            return result.output
+            return result.data
         except Exception as e:
             logger.error(
                 f"Research agent ({angle}) failed "
