@@ -88,7 +88,7 @@ async def detect_claims(text: str) -> list[str]:
             logger.info(f"Running claim detection ({len(text)} chars, key #{api_keys.nvidia_keys.active_index})...")
             async with config.llm_semaphore:
                 response = await agent.run(text)
-            detected = response.output.claims
+            detected = response.data.claims
             logger.info(f"Claim detection returned {len(detected)} claim(s).")
             return [c.strip() for c in detected if c.strip()]
         except Exception as e:
