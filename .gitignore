@@ -33,6 +33,7 @@ desktop.ini
 wireframe-skill/
 factcheck_claims.csv
 export_csv.py
+website/
 
 # Logs
 logs/
@@ -43,6 +44,13 @@ logs/
 *.wav
 *.mp4
 *.m4a
+*.csv
+*.zip
+
+# User-requested excludes (privacy / not for public release)
+.env.example
+backend/vercel.json
+backend/deploy.ps1
 
 # OS generated files
 .DS_Store

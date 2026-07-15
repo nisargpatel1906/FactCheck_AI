@@ -8,7 +8,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/)
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Manifest%20V3-yellow)](https://developer.chrome.com/docs/extensions/mv3/intro/)
-[![Status: In Development](https://img.shields.io/badge/Status-In%20Development-orange)]()
+[![Status: Available](https://img.shields.io/badge/Status-Available-success)]()
+
+<br/>
+
+[**🌐 Visit Website**](https://factcheckai-website.onrender.com) &nbsp;&nbsp;•&nbsp;&nbsp; [**📥 Download on Chrome Web Store**](https://chromewebstore.google.com/detail/apjkboabbeoedfmifkkpmnfpkkdbdodg?utm_source=item-share-cb)
+
+<br/>
 
 <img src="demo.gif" alt="FactCheck AI Demo" width="100%" style="max-width: 850px; margin-top: 20px; border-radius: 8px;">
 
@@ -191,7 +197,7 @@ FactCheck_AI/
 │       ├── debate.py        # Multi-agent stance debate logic
 │       └── judge.py         # Synthesizes final verdict, reasoning, and sources
 ├── tests/                   # Relocated verification test scripts
-├── LICENSE                  # GNU General Public License v3.0
+├── LICENSE                  # MIT License
 ├── README.md
 ├── logo.png                 # Main project logo
 └── start.bat                # Root runner script to boot backend server
